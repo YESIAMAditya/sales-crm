@@ -633,108 +633,23 @@
         });
     }
 
-    // 📁 BULK EXCEL UPLOAD AND DATA SPLITTING MANAGEMENT ENGINE 
-    const uploadForm = document.getElementById('uploadForm');
-    if (uploadForm) {
-        uploadForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            if (typeof XLSX === 'undefined') return alert('❌ Excel processing library load nahi hui hai!');
-            
-            const fileInput = document.getElementById('myFile');
-            const empSelect = document.getElementById('empSelect');
-            if (!fileInput || !fileInput.files[0] || !empSelect) return alert('File or dropdown element missing.');
-            
-            if (empSelect.value !== "SPLIT_EQUALLY") {
-                // SINGLE UPLOAD MODE
-                const formData = new FormData();
-                formData.append('myFile', fileInput.files[0]);
-                formData.append('adminId', adminInfo.id);
-                formData.append('employeeId', empSelect.value);
+    // dashboard.html mein ye block replace karo
+if (empSelect.value === "SPLIT_EQUALLY") {
+    const selectedEmployeeIds = [];
+    currentActiveEmployeesBackup.forEach(emp => {
+        const cb = document.getElementById(`split-checkbox-${emp._id}`);
+        if (cb && cb.checked) selectedEmployeeIds.push(emp._id);
+    });
 
-                const res = await fetch('/api/documents/upload', { method: 'POST', body: formData });
-                if(res.ok) {
-                    alert('🚀 Sheet Assigned to Single Employee Successfully!');
-                    uploadForm.reset();
-                    const splitterBox = document.getElementById('splitterSection');
-                    if (splitterBox) splitterBox.style.display = "none";
-                    fetchLiveReports();
-                } else { alert('Upload failed'); }
-            } else {
-                // EQUAL SPLIT MODE
-                const selectedEmployeeIds = [];
-                currentActiveEmployeesBackup.forEach(emp => {
-                    const cb = document.getElementById(`split-checkbox-${emp._id}`);
-                    if (cb && cb.checked) { selectedEmployeeIds.push(emp._id); }
-                });
+    const formData = new FormData();
+    formData.append('myFile', fileInput.files[0]); // Badi file hi bhejo
+    formData.append('adminId', adminInfo.id);
+    formData.append('employeeId', "SPLIT_EQUALLY"); 
+    formData.append('selectedEmployees', JSON.stringify(selectedEmployeeIds));
 
-                if (selectedEmployeeIds.length === 0) {
-                    return alert('⚠️ Data split karne ke liye kam se kam ek employee ko Ticked rakhna zaroori hai!');
-                }
-
-                alert(`⏳ Excel data load ho raha hai. Total ${selectedEmployeeIds.length} employees me data break hoga...`);
-
-                const file = fileInput.files[0];
-                const reader = new FileReader();
-
-                reader.onload = async function(e) {
-                    try {
-                        const data = new Uint8Array(e.target.result);
-                        const workbook = XLSX.read(data, { type: 'array' });
-                        const firstSheetName = workbook.SheetNames[0];
-                        const worksheet = workbook.Sheets[firstSheetName];
-                        
-                        const rows = XLSX.utils.sheet_to_json(worksheet);
-                        if(rows.length === 0) return alert('❌ Uploaded Excel file is empty!');
-
-                        let totalRows = rows.length;
-                        let empCount = selectedEmployeeIds.length;
-                        let chunkSize = Math.ceil(totalRows / empCount);
-                        let successCounter = 0;
-
-                        // Loop through employees and generate UNIQUE chunks
-                        for (let i = 0; i < empCount; i++) {
-                            let startIdx = i * chunkSize;
-                            let endIdx = Math.min(startIdx + chunkSize, totalRows);
-                            if (startIdx >= totalRows) break; 
-
-                            let subArray = rows.slice(startIdx, endIdx);
-                            const subWorksheet = XLSX.utils.json_to_sheet(subArray);
-                            const subWorkbook = XLSX.utils.book_new();
-                            XLSX.utils.book_append_sheet(subWorkbook, subWorksheet, "AssignedLeads");
-                            
-                            // Essential: write out as array type
-                            const excelBuffer = XLSX.write(subWorkbook, { bookType: 'xlsx', type: 'array' });
-                            const blob = new Blob([excelBuffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-                            
-                            // 🔥 FIX: Added unique timestamp & index to filename so multer doesn't conflict or duplicate reference data
-                            const uniqueFileName = `Part_${i+1}_${Date.now()}_${file.name}`;
-                            const splitFile = new File([blob], uniqueFileName, { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-
-                            const formData = new FormData();
-                            formData.append('myFile', splitFile);
-                            formData.append('adminId', adminInfo.id);
-                            formData.append('employeeId', selectedEmployeeIds[i]);
-
-                            // Fire standard individual requests sequentially
-                            const res = await fetch('/api/documents/upload', { method: 'POST', body: formData });
-                            if(res.ok) successCounter++;
-                        }
-
-                        alert(`🎯 Bulk distribution completed. Total ${successCounter} split sheets distributed perfectly!`);
-                        uploadForm.reset();
-                        const splitterBox = document.getElementById('splitterSection');
-                        if (splitterBox) splitterBox.style.display = "none";
-                        fetchLiveReports();
-
-                    } catch (err) {
-                        console.error(err);
-                        alert('❌ Error reading or splitting excel architecture.');
-                    }
-                };
-                reader.readAsArrayBuffer(file);
-            }
-        });
-    }
+    const res = await fetch('/api/documents/upload', { method: 'POST', body: formData });
+    // ... baki response handling
+}
 
     async function changePassword(empId) {
         const passInput = document.getElementById(`pass-${empId}`);

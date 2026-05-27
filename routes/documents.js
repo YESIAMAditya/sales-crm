@@ -63,28 +63,21 @@ router.post('/upload', upload.single('myFile'), async (req, res) => {
             const createdDocs = [];
 
             // Har employee ke liye file banayein
-            for (let i = 0; i < empIds.length; i++) {
-                const chunk = sheetData.slice(i * chunkSize, (i + 1) * chunkSize);
-                if (chunk.length === 0) continue;
+          // Loop ke andar slice check karne ke liye ye logic use karein
+    for (let i = 0; i < empIds.length; i++) {
+    // START index aur END index ko explicitly calculate karein
+    const start = i * chunkSize;
+    const end = (i + 1) * chunkSize;
+    
+    // Yahan console.log karke check karein ki kya har baar alag data slice ho raha hai
+    const chunk = sheetData.slice(start, end);
+    
+    console.log(`Employee ${i} | Range: ${start} to ${end} | Chunk Size: ${chunk.length}`);
 
-                // Nayi Excel file create karein
-                const newWB = xlsx.utils.book_new();
-                xlsx.utils.book_append_sheet(newWB, xlsx.utils.json_to_sheet(chunk), "AssignedLeads");
-                
-                const uniqueFileName = `split-${i}-${Date.now()}-${Math.floor(Math.random()*1000)}.xlsx`;
-                const filePath = path.join('./public/uploads/', uniqueFileName);
-                
-                xlsx.writeFile(newWB, filePath);
+    if (chunk.length === 0) continue;
 
-                // Database mein entry daalein
-                const newDoc = await Document.create({
-                    adminId: adminObjId,
-                    employeeId: new mongoose.Types.ObjectId(empIds[i]),
-                    fileName: `Part_${i + 1}_${req.file.originalname}`,
-                    filePath: `/uploads/${uniqueFileName}`
-                });
-                createdDocs.push(newDoc);
-            }
+    // ... (rest of your workbook code)
+}
 
             // Original badi file ko delete karein
             if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
