@@ -62,7 +62,7 @@
 
             try {
                 // Backend API ko data bhejna
-                const response = await fetch('http://localhost:5000/api/auth/register-admin', {
+                const response = await fetch('/api/auth/register-admin', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ companyName, email, password, secretKey })
@@ -86,7 +86,7 @@
                     setTimeout(() => {
                        // login.html ke andar line number 76 ke aas-pass badlein:
                     // index.html ke andar line number 84 ke aas-pass badlein:
-                    window.location.href = 'http://localhost:5000/dashboard.html';
+                    window.location.href = '/api/auth/dashboard.html';
                     }, 1200); // 1.2 second ka delay diya taaki user ko "🎉 Registration Successful" ka alert dikh sake
 
                 } else {

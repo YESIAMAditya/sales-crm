@@ -66,14 +66,13 @@ document.getElementById('adminLoginForm').addEventListener('submit', async (e) =
     e.preventDefault();
     const email = document.getElementById('loginEmail').value;
     const password = document.getElementById('loginPassword').value;
-
-    try {
-        // 🚀 Pura URL localhost port ke sath dal diya hai
-        const res = await fetch('http://localhost:5000/api/auth/login-admin', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, password })
-        });
+try {
+    // Sahi URL path: / se shuru karo
+    const res = await fetch('/api/auth/login-admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+    });
 
         const data = await res.json();
 
@@ -86,7 +85,7 @@ document.getElementById('adminLoginForm').addEventListener('submit', async (e) =
             
             // Dashboard par redirect
             // login.html ke andar line number 76 ke aas-pass badlein:
-window.location.href = 'http://localhost:5000/dashboard.html';
+window.location.href = '/api/auth/dashboard.html';
         } else {
             alert('❌ Login Failed: ' + data.message);
         }
@@ -105,7 +104,7 @@ document.getElementById('adminRecoveryForm').addEventListener('submit', async (e
 
     try {
         // 🚀 Recovery endpoint par bhi pura URL set kar diya hai
-        const res = await fetch('http://localhost:5000/api/auth/admin-forgot-password', { 
+        const res = await fetch('/api/auth/admin-forgot-password', { 
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email, secretKey, newPassword })
