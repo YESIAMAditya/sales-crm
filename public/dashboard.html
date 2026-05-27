@@ -293,412 +293,653 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
 <script>
-    // 🔒 [ROUTE PROTECTION]
-    const rawAdminData = localStorage.getItem('adminInfo');
-    if (!rawAdminData) {
-        alert("🚨 Unauthorized Access! Pehle Admin Login karna zaroori hai.");
-        window.location.href = '/admin-login.html';
-    }
+const rawAdminData=localStorage.getItem('adminInfo');
 
-    const adminInfo = JSON.parse(rawAdminData); 
-    let allReports = []; 
-    let filteredReportsGlobal = []; 
-    let currentActiveEmployeesBackup = []; 
-    let clientSideArchiveList = JSON.parse(localStorage.getItem('adminWorkspaceArchive')) || [];
-
-    // 🌗 [THEME CONTROLLER LOGIC]
-    if (localStorage.getItem('theme') === 'light') {
-        document.body.classList.add('light-theme');
-        const themeBtn = document.getElementById('themeBtn');
-        if (themeBtn) themeBtn.innerText = "🌙 Dark Mode";
-    }
-
-    function toggleTheme() {
-        const body = document.body;
-        const btn = document.getElementById('themeBtn');
-        if (!btn) return;
-        body.classList.toggle('light-theme');
-        
-        if (body.classList.contains('light-theme')) {
-            localStorage.setItem('theme', 'light');
-            btn.innerText = "🌙 Dark Mode";
-        } else {
-            localStorage.setItem('theme', 'dark');
-            btn.innerText = "☀️ Light Mode";
-        }
-    }
-
-    async function initAdminDashboard() {
-        await loadAdminData();
-        await fetchLiveReports();
-    }
-
-    function handleAssignDropdown(value) {
-        const splitterBox = document.getElementById('splitterSection');
-        if (splitterBox) {
-            splitterBox.style.display = value === "SPLIT_EQUALLY" ? "block" : "none";
-        }
-    }
-
-    // Load active/inactive employees list
-    async function loadAdminData() {
-        try {
-            const res = await fetch(`/api/employees/all/${adminInfo.id}`);
-            if (!res.ok) throw new Error('Failed to fetch employees list');
-            const employees = await res.json();
-            
-            const dropdown = document.getElementById('empSelect');
-            const empFilterDropdown = document.getElementById('reportEmpFilter');
-            const tbody = document.getElementById('adminEmpTableBody');
-            const splitterList = document.getElementById('splitterCheckboxesList');
-            
-            if (!dropdown || !empFilterDropdown || !tbody || !splitterList) return;
-
-            const savedDropdownVal = dropdown.value;
-            const savedFilterVal = empFilterDropdown.value;
-
-            dropdown.innerHTML = '<option value="">-- Select Employee --</option>';
-            dropdown.innerHTML += '<option value="SPLIT_EQUALLY" style="font-weight:bold;">🔄 -- Split Equally Among Team --</option>';
-            
-            empFilterDropdown.innerHTML = '<option value="All">All Employees</option>';
-            tbody.innerHTML = '';
-            splitterList.innerHTML = '';
-
-            currentActiveEmployeesBackup = employees.filter(e => e.status === 'Active');
-
-            employees.forEach(emp => {
-                empFilterDropdown.innerHTML += `<option value="${emp._id}">${emp.name}</option>`;
-
-                if(emp.status === 'Active') {
-                    dropdown.innerHTML += `<option value="${emp._id}">${emp.name}</option>`;
-                    splitterList.innerHTML += `
-                        <div class="splitter-item">
-                            <input type="checkbox" id="split-checkbox-${emp._id}" value="${emp._id}" checked>
-                            <label for="split-checkbox-${emp._id}">${emp.name} (${emp.email})</label>
-                        </div>
-                    `;
-                }
-
-                const isSuspended = emp.status === 'Suspended';
-                tbody.innerHTML += `
-                    <tr>
-                        <td><strong>${emp.name}</strong><br><small style="color:var(--text-muted)">${emp.email}</small></td>
-                        <td><span class="${isSuspended ? 'status-suspended' : 'status-active'}">${emp.status || 'Active'}</span></td>
-                        <td>
-                            <button class="btn btn-sm" onclick="forceKillSession('${emp._id}')" style="background:#64748b; color:white; font-size:11px;">
-                                🔓 Kill Device Lock
-                            </button>
-                        </td>
-                        <td>
-                            <div style="display: flex; gap: 4px; align-items: center;">
-                                <input type="password" id="pass-${emp._id}" placeholder="New Pass" style="width:70px; font-size:11px; padding:2px;">
-                                <button class="btn btn-sm" onclick="changePassword('${emp._id}')" style="background:#3b82f6; color:white; font-size:11px;">🔑</button>
-                                <button class="btn btn-sm ${isSuspended ? '' : 'btn-danger'}" onclick="toggleAccess('${emp._id}', '${emp.status || 'Active'}')">
-                                    ${isSuspended ? '🔓 Activate' : '🚫 Block'}
-                                </button>
-                                <button class="btn btn-sm btn-danger" onclick="deleteEmployee('${emp._id}')" style="background:#ef4444;">🗑️</button>
-                            </div>
-                        </td>
-                    </tr>
-                `;
-            });
-
-            dropdown.value = savedDropdownVal;
-            empFilterDropdown.value = savedFilterVal;
-
-        } catch (err) { 
-            console.error("Error loading admin core staff metrics:", err); 
-        }
-    }
-
-    async function fetchLiveReports() {
-        try {
-            const res = await fetch(`/api/documents/admin-reports/${adminInfo.id}`);
-            if (!res.ok) throw new Error('Network reporting engine response mismatch');
-            allReports = await res.json();
-            filterReports(true); 
-        } catch (err) { 
-            console.error("Error in real-time reporting pipeline sync:", err); 
-        }
-    }
-
-    // 🎯 RENDERING + COUNTERS AGGREGATION LOGIC
-    function renderReports(reports) {
-        const tbody = document.getElementById('adminReportTableBody');
-        if (!tbody) return;
-        tbody.innerHTML = '';
-
-        let countNew = 0; let countRinging = 0; let countInterested = 0; let countFollowUp = 0; let countRejected = 0;
-
-        // 🧹 WORKSPACE CLEANER EXCLUSION LAYER FILTER
-        const activeUnarchivedLeads = reports.filter(rep => !clientSideArchiveList.includes(rep._id));
-
-        if(activeUnarchivedLeads.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:#888;">No active records found. Clean filters or Reset Workspace.</td></tr>';
-            updateCounterUI(0, 0, 0, 0, 0);
-            return;
-        }
-
-        activeUnarchivedLeads.forEach(rep => {
-            const empName = rep.employeeId ? rep.employeeId.name : '<span style="color:#ef4444; font-weight:bold;">Deleted Emp</span>';
-            const fileName = rep.documentId ? rep.documentId.fileName : 'Direct Entry/Deleted Sheet';
-            const dateTime = new Date(rep.updatedAt).toLocaleString();
-            const statusCSSClass = String(rep.status).toLowerCase().replace(' ', '-');
-
-            if (rep.status === 'New') countNew++;
-            else if (rep.status === 'Ringing') countRinging++;
-            else if (rep.status === 'Interested') countInterested++;
-            else if (rep.status === 'Follow-up') countFollowUp++;
-            else if (rep.status === 'Rejected') countRejected++;
-
-            tbody.innerHTML += `
-                <tr>
-                    <td><strong>${empName}</strong></td>
-                    <td><small style="color:#22c55e">${fileName}</small></td>
-                    <td><strong>${rep.customerName}</strong><br><small style="color:var(--text-muted)">${rep.customerPhone}</small></td>
-                    <td><span class="status-badge status-${statusCSSClass}">${rep.status}</span></td>
-                    <td>${rep.remarks || '-'}</td>
-                    <td><small>${dateTime}</small></td>
-                </tr>
-            `;
-        });
-
-        updateCounterUI(countNew, countRinging, countInterested, countFollowUp, countRejected);
-    }
-
-    function updateCounterUI(cNew, cRing, cInt, cFollow, cRej) {
-        if(document.getElementById('counterNew')) document.getElementById('counterNew').innerText = cNew;
-        if(document.getElementById('counterRinging')) document.getElementById('counterRinging').innerText = cRing;
-        if(document.getElementById('counterInterested')) document.getElementById('counterInterested').innerText = cInt;
-        if(document.getElementById('counterFollowUp')) document.getElementById('counterFollowUp').innerText = cFollow;
-        if(document.getElementById('counterRejected')) document.getElementById('counterRejected').innerText = cRej;
-    }
-
-    function filterReports(isBackgroundSync = false) {
-        const empFilter = document.getElementById('reportEmpFilter');
-        const statusFilter = document.getElementById('reportStatusFilter');
-        const startDateEl = document.getElementById('reportStartDate');
-        const endDateEl = document.getElementById('reportEndDate');
-
-        if (!empFilter || !statusFilter || !startDateEl || !endDateEl) return;
-
-        const selectedEmpId = empFilter.value;
-        const selectedStatus = statusFilter.value;
-        const startDateVal = startDateEl.value;
-        const endDateVal = endDateEl.value;
-
-        let filtered = allReports;
-
-        if (selectedEmpId !== 'All') {
-            filtered = filtered.filter(r => r.employeeId && r.employeeId._id === selectedEmpId);
-        }
-        if (selectedStatus !== 'All') {
-            filtered = filtered.filter(r => r.status === selectedStatus);
-        }
-        if (startDateVal) {
-            const start = new Date(startDateVal); start.setHours(0,0,0,0);
-            filtered = filtered.filter(r => new Date(r.updatedAt) >= start);
-        }
-        if (endDateVal) {
-            const end = new Date(endDateVal); end.setHours(23,59,59,999);
-            filtered = filtered.filter(r => new Date(r.updatedAt) <= end);
-        }
-
-        filteredReportsGlobal = filtered; 
-        renderReports(filtered);
-    }
-
-    // 🧹 WORKSPACE MODAL CONTROLLER INTERACTION
-    function openArchiveModal() { 
-        const modal = document.getElementById('archiveModal');
-        if (modal) modal.style.display = "flex"; 
-    }
-    function closeArchiveModal() { 
-        const modal = document.getElementById('archiveModal');
-        if (modal) modal.style.display = "none"; 
-    }
-
-    function processWorkspaceArchive() {
-        const checkedStatuses = [];
-        const archRej = document.getElementById('archRej');
-        const archInt = document.getElementById('archInt');
-        const archRing = document.getElementById('archRing');
-        const archFollow = document.getElementById('archFollow');
-        const timeframeEl = document.getElementById('archiveTimeframe');
-
-        if(archRej && archRej.checked) checkedStatuses.push('Rejected');
-        if(archInt && archInt.checked) checkedStatuses.push('Interested');
-        if(archRing && archRing.checked) checkedStatuses.push('Ringing');
-        if(archFollow && archFollow.checked) checkedStatuses.push('Follow-up');
-        
-        const daysLimit = timeframeEl ? parseInt(timeframeEl.value) : 0;
-        let archiveCounter = 0;
-
-        allReports.forEach(rep => {
-            let matchesStatus = checkedStatuses.includes(rep.status);
-            let matchesDate = false;
-
-            if(daysLimit > 0) {
-                const leadDate = new Date(rep.updatedAt);
-                const cutoffDate = new Date();
-                cutoffDate.setDate(cutoffDate.getDate() - daysLimit);
-                if(leadDate < cutoffDate) { matchesDate = true; }
-            }
-
-            if(matchesStatus || matchesDate) {
-                if(!clientSideArchiveList.includes(rep._id)) {
-                    clientSideArchiveList.push(rep._id);
-                    archiveCounter++;
-                }
-            }
-        });
-
-        localStorage.setItem('adminWorkspaceArchive', JSON.stringify(clientSideArchiveList));
-        alert(`🧹 Cleaned! Total ${archiveCounter} rows successfully moved to backend storage archives.`);
-        closeArchiveModal();
-        filterReports();
-    }
-
-    // 🔒 RELEASING ANTI-CHEAT DEVICE MULTI-LOGIN IDENTIFIER
-    async function forceKillSession(empId) {
-        if(!confirm("Kya aap is employee ke lagaye gaye security session hardware token lock ko clear karna chahte hain? Iske baad wo naye system se login kar payega.")) return;
-        try {
-            const res = await fetch(`/api/employees/clear-device-lock/${empId}`, { method: 'PUT' });
-            if(res.ok) {
-                alert("🔓 Token configuration released successfully!");
-                loadAdminData();
-            } else {
-                alert("System unable to communicate with token engine.");
-            }
-        } catch(err) { alert("Server connectivity block."); }
-    }
-
-    function clearDateFilters() {
-        const start = document.getElementById('reportStartDate');
-        const end = document.getElementById('reportEndDate');
-        if (start) start.value = '';
-        if (end) end.value = '';
-        filterReports();
-    }
-
-    function downloadReportExcel() {
-        if (typeof XLSX === 'undefined') return alert('❌ Excel processing library (SheetJS) load nahi hui hai!');
-        if(filteredReportsGlobal.length === 0) return alert('No data available to download!');
-        const activeUnarchivedExcel = filteredReportsGlobal.filter(rep => !clientSideArchiveList.includes(rep._id));
-        
-        const excelRows = activeUnarchivedExcel.map(rep => ({
-            "Employee Name": rep.employeeId ? rep.employeeId.name : 'N/A',
-            "Source Sheet": rep.documentId ? rep.documentId.fileName : 'N/A',
-            "Customer Name": rep.customerName,
-            "Customer Phone": rep.customerPhone,
-            "Status": rep.status,
-            "Remarks": rep.remarks || '',
-            "Date Time Logged": new Date(rep.updatedAt).toLocaleString()
-        }));
-
-        const worksheet = XLSX.utils.json_to_sheet(excelRows);
-        const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, "Calling Reports");
-        XLSX.writeFile(workbook, `CRM_Report_${new Date().toISOString().slice(0,10)}.xlsx`);
-    }
-
-    // 👤 CREATE EMPLOYEE FORM SUBSCRIPTION
-    const addEmpForm = document.getElementById('addEmpForm');
-    if (addEmpForm) {
-        addEmpForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const name = document.getElementById('empName').value;
-            const email = document.getElementById('empEmail').value;
-            const password = document.getElementById('empPass').value;
-
-            try {
-                const res = await fetch('/api/employees/add', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ adminId: adminInfo.id, name, email, password })
-                });
-
-                if(res.ok) {
-                    alert('🎉 Employee ID Created Successfully!');
-                    addEmpForm.reset();
-                    initAdminDashboard();
-                } else { 
-                    const errData = await res.json().catch(() => ({}));
-                    alert(`Error creating account: ${errData.message || 'Email already active'}`); 
-                }
-            } catch (error) {
-                console.error(error);
-                alert("Server connection timeout!");
-            }
-        });
-    }
-
-    // dashboard.html mein ye block replace karo
-if (empSelect.value === "SPLIT_EQUALLY") {
-    const selectedEmployeeIds = [];
-    currentActiveEmployeesBackup.forEach(emp => {
-        const cb = document.getElementById(`split-checkbox-${emp._id}`);
-        if (cb && cb.checked) selectedEmployeeIds.push(emp._id);
-    });
-
-    const formData = new FormData();
-    formData.append('myFile', fileInput.files[0]); // Badi file hi bhejo
-    formData.append('adminId', adminInfo.id);
-    formData.append('employeeId', "SPLIT_EQUALLY"); 
-    formData.append('selectedEmployees', JSON.stringify(selectedEmployeeIds));
-
-    const res = await fetch('/api/documents/upload', { method: 'POST', body: formData });
-    // ... baki response handling
+if(!rawAdminData){
+alert("🚨 Unauthorized Access! Pehle Admin Login karna zaroori hai.");
+window.location.href='/admin-login.html';
 }
 
-    async function changePassword(empId) {
-        const passInput = document.getElementById(`pass-${empId}`);
-        const newPassword = passInput ? passInput.value : '';
-        if(!newPassword) return alert('Please enter a new password first!');
-        const res = await fetch(`/api/employees/update-password/${empId}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ newPassword })
-        });
-        if(res.ok) { 
-            alert('🔑 Password changed successfully!'); 
-            loadAdminData(); 
-        }
-    }
+const adminInfo=JSON.parse(rawAdminData);
+let allReports=[];
+let filteredReportsGlobal=[];
+let currentActiveEmployeesBackup=[];
+let clientSideArchiveList=JSON.parse(localStorage.getItem('adminWorkspaceArchive'))||[];
 
-    async function toggleAccess(empId, currentStatus) {
-        const nextStatus = currentStatus === 'Active' ? 'Suspended' : 'Active';
-        if(!confirm(`Are you sure you want to make this employee ${nextStatus}?`)) return;
-        const res = await fetch(`/api/employees/toggle-status/${empId}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ status: nextStatus })
-        });
-        if(res.ok) { loadAdminData(); }
-    }
+document.addEventListener('DOMContentLoaded',()=>{
 
-    async function deleteEmployee(empId) {
-        if(!confirm('🚨 Warning! This will permanently delete the employee login. Proceed?')) return;
-        const res = await fetch(`/api/employees/delete/${empId}`, { method: 'DELETE' });
-        if(res.ok) { alert('🗑️ Employee deleted!'); initAdminDashboard(); }
-    }
+const themeBtn=document.getElementById('themeBtn');
 
-    // Run Initial Load
-    initAdminDashboard();
+if(localStorage.getItem('theme')==='light'){
+document.body.classList.add('light-theme');
+if(themeBtn) themeBtn.innerText="🌙 Dark Mode";
+}else{
+if(themeBtn) themeBtn.innerText="☀️ Light Mode";
+}
 
-    // ⏱️ [AUTO-POLLING SYNC]
-    setInterval(() => {
-        fetchLiveReports();
-    }, 5000);
+if(themeBtn){
+themeBtn.addEventListener('click',toggleTheme);
+}
 
-    // 🚪 [SECURE LOGOUT]
-    function logout() { 
-        if(confirm("Sign out karna chahte hain?")) {
-            localStorage.clear(); 
-            sessionStorage.clear();
-            window.location.href = '/admin-login.html'; 
-        }
-    }
+const logoutBtn=document.getElementById('logoutBtn');
+if(logoutBtn){
+logoutBtn.addEventListener('click',logout);
+}
+
+initAdminDashboard();
+
+setInterval(()=>{
+fetchLiveReports();
+},5000);
+
+});
+
+function toggleTheme(){
+const body=document.body;
+const btn=document.getElementById('themeBtn');
+
+if(!btn) return;
+
+body.classList.toggle('light-theme');
+
+if(body.classList.contains('light-theme')){
+localStorage.setItem('theme','light');
+btn.innerText="🌙 Dark Mode";
+}else{
+localStorage.setItem('theme','dark');
+btn.innerText="☀️ Light Mode";
+}
+}
+
+async function initAdminDashboard(){
+await loadAdminData();
+await fetchLiveReports();
+}
+
+function handleAssignDropdown(value){
+const splitterBox=document.getElementById('splitterSection');
+if(splitterBox){
+splitterBox.style.display=value==="SPLIT_EQUALLY"?"block":"none";
+}
+}
+
+async function loadAdminData(){
+try{
+
+const res=await fetch(`/api/employees/all/${adminInfo.id}`);
+
+if(!res.ok){
+throw new Error('Failed to fetch employees list');
+}
+
+const employees=await res.json();
+
+const dropdown=document.getElementById('empSelect');
+const empFilterDropdown=document.getElementById('reportEmpFilter');
+const tbody=document.getElementById('adminEmpTableBody');
+const splitterList=document.getElementById('splitterCheckboxesList');
+
+if(!dropdown || !empFilterDropdown || !tbody || !splitterList) return;
+
+const savedDropdownVal=dropdown.value;
+const savedFilterVal=empFilterDropdown.value;
+
+dropdown.innerHTML='<option value="">-- Select Employee --</option>';
+dropdown.innerHTML+='<option value="SPLIT_EQUALLY" style="font-weight:bold;">🔄 -- Split Equally Among Team --</option>';
+
+empFilterDropdown.innerHTML='<option value="All">All Employees</option>';
+
+tbody.innerHTML='';
+splitterList.innerHTML='';
+
+currentActiveEmployeesBackup=employees.filter(e=>e.status==='Active');
+
+employees.forEach(emp=>{
+
+empFilterDropdown.innerHTML+=`<option value="${emp._id}">${emp.name}</option>`;
+
+if(emp.status==='Active'){
+
+dropdown.innerHTML+=`<option value="${emp._id}">${emp.name}</option>`;
+
+splitterList.innerHTML+=`
+<div class="splitter-item">
+<input type="checkbox" id="split-checkbox-${emp._id}" value="${emp._id}" checked>
+<label for="split-checkbox-${emp._id}">${emp.name} (${emp.email})</label>
+</div>
+`;
+
+}
+
+const isSuspended=emp.status==='Suspended';
+
+tbody.innerHTML+=`
+<tr>
+<td>
+<strong>${emp.name}</strong><br>
+<small style="color:var(--text-muted)">${emp.email}</small>
+</td>
+
+<td>
+<span class="${isSuspended?'status-suspended':'status-active'}">
+${emp.status || 'Active'}
+</span>
+</td>
+
+<td>
+<button class="btn btn-sm" onclick="forceKillSession('${emp._id}')" style="background:#64748b;color:white;font-size:11px;">
+🔓 Kill Device Lock
+</button>
+</td>
+
+<td>
+<div style="display:flex;gap:4px;align-items:center;">
+<input type="password" id="pass-${emp._id}" placeholder="New Pass" style="width:70px;font-size:11px;padding:2px;">
+
+<button class="btn btn-sm" onclick="changePassword('${emp._id}')" style="background:#3b82f6;color:white;font-size:11px;">
+🔑
+</button>
+
+<button class="btn btn-sm ${isSuspended?'':'btn-danger'}" onclick="toggleAccess('${emp._id}','${emp.status || 'Active'}')">
+${isSuspended?'🔓 Activate':'🚫 Block'}
+</button>
+
+<button class="btn btn-sm btn-danger" onclick="deleteEmployee('${emp._id}')" style="background:#ef4444;">
+🗑️
+</button>
+</div>
+</td>
+</tr>
+`;
+
+});
+
+dropdown.value=savedDropdownVal;
+empFilterDropdown.value=savedFilterVal;
+
+}catch(err){
+console.error(err);
+}
+}
+
+async function fetchLiveReports(){
+
+try{
+
+const res=await fetch(`/api/documents/admin-reports/${adminInfo.id}`);
+
+if(!res.ok){
+throw new Error('Network reporting engine response mismatch');
+}
+
+allReports=await res.json();
+
+filterReports();
+
+}catch(err){
+console.error(err);
+}
+}
+
+function renderReports(reports){
+
+const tbody=document.getElementById('adminReportTableBody');
+
+if(!tbody) return;
+
+tbody.innerHTML='';
+
+let countNew=0;
+let countRinging=0;
+let countInterested=0;
+let countFollowUp=0;
+let countRejected=0;
+
+const activeUnarchivedLeads=reports.filter(rep=>!clientSideArchiveList.includes(rep._id));
+
+if(activeUnarchivedLeads.length===0){
+
+tbody.innerHTML=`
+<tr>
+<td colspan="6" style="text-align:center;color:#888;">
+No active records found.
+</td>
+</tr>
+`;
+
+updateCounterUI(0,0,0,0,0);
+
+return;
+}
+
+activeUnarchivedLeads.forEach(rep=>{
+
+const empName=rep.employeeId ? rep.employeeId.name : 'Deleted Emp';
+const fileName=rep.documentId ? rep.documentId.fileName : 'Deleted Sheet';
+const dateTime=new Date(rep.updatedAt).toLocaleString();
+const statusCSSClass=String(rep.status).toLowerCase().replace(' ','-');
+
+if(rep.status==='New') countNew++;
+else if(rep.status==='Ringing') countRinging++;
+else if(rep.status==='Interested') countInterested++;
+else if(rep.status==='Follow-up') countFollowUp++;
+else if(rep.status==='Rejected') countRejected++;
+
+tbody.innerHTML+=`
+<tr>
+<td><strong>${empName}</strong></td>
+
+<td>
+<small style="color:#22c55e">${fileName}</small>
+</td>
+
+<td>
+<strong>${rep.customerName}</strong><br>
+<small style="color:var(--text-muted)">
+${rep.customerPhone}
+</small>
+</td>
+
+<td>
+<span class="status-badge status-${statusCSSClass}">
+${rep.status}
+</span>
+</td>
+
+<td>${rep.remarks || '-'}</td>
+
+<td>
+<small>${dateTime}</small>
+</td>
+</tr>
+`;
+
+});
+
+updateCounterUI(
+countNew,
+countRinging,
+countInterested,
+countFollowUp,
+countRejected
+);
+
+}
+
+function updateCounterUI(cNew,cRing,cInt,cFollow,cRej){
+
+if(document.getElementById('counterNew')){
+document.getElementById('counterNew').innerText=cNew;
+}
+
+if(document.getElementById('counterRinging')){
+document.getElementById('counterRinging').innerText=cRing;
+}
+
+if(document.getElementById('counterInterested')){
+document.getElementById('counterInterested').innerText=cInt;
+}
+
+if(document.getElementById('counterFollowUp')){
+document.getElementById('counterFollowUp').innerText=cFollow;
+}
+
+if(document.getElementById('counterRejected')){
+document.getElementById('counterRejected').innerText=cRej;
+}
+
+}
+
+function filterReports(){
+
+const empFilter=document.getElementById('reportEmpFilter');
+const statusFilter=document.getElementById('reportStatusFilter');
+const startDateEl=document.getElementById('reportStartDate');
+const endDateEl=document.getElementById('reportEndDate');
+
+if(!empFilter || !statusFilter || !startDateEl || !endDateEl) return;
+
+const selectedEmpId=empFilter.value;
+const selectedStatus=statusFilter.value;
+const startDateVal=startDateEl.value;
+const endDateVal=endDateEl.value;
+
+let filtered=allReports;
+
+if(selectedEmpId!=='All'){
+filtered=filtered.filter(r=>r.employeeId && r.employeeId._id===selectedEmpId);
+}
+
+if(selectedStatus!=='All'){
+filtered=filtered.filter(r=>r.status===selectedStatus);
+}
+
+if(startDateVal){
+const start=new Date(startDateVal);
+start.setHours(0,0,0,0);
+
+filtered=filtered.filter(r=>new Date(r.updatedAt)>=start);
+}
+
+if(endDateVal){
+const end=new Date(endDateVal);
+end.setHours(23,59,59,999);
+
+filtered=filtered.filter(r=>new Date(r.updatedAt)<=end);
+}
+
+filteredReportsGlobal=filtered;
+
+renderReports(filtered);
+
+}
+
+function clearDateFilters(){
+
+const start=document.getElementById('reportStartDate');
+const end=document.getElementById('reportEndDate');
+
+if(start) start.value='';
+if(end) end.value='';
+
+filterReports();
+
+}
+
+function openArchiveModal(){
+const modal=document.getElementById('archiveModal');
+if(modal) modal.style.display='flex';
+}
+
+function closeArchiveModal(){
+const modal=document.getElementById('archiveModal');
+if(modal) modal.style.display='none';
+}
+
+function processWorkspaceArchive(){
+
+const checkedStatuses=[];
+
+if(document.getElementById('archRej')?.checked){
+checkedStatuses.push('Rejected');
+}
+
+if(document.getElementById('archInt')?.checked){
+checkedStatuses.push('Interested');
+}
+
+if(document.getElementById('archRing')?.checked){
+checkedStatuses.push('Ringing');
+}
+
+if(document.getElementById('archFollow')?.checked){
+checkedStatuses.push('Follow-up');
+}
+
+const timeframeEl=document.getElementById('archiveTimeframe');
+
+const daysLimit=timeframeEl ? parseInt(timeframeEl.value) : 0;
+
+let archiveCounter=0;
+
+allReports.forEach(rep=>{
+
+let matchesStatus=checkedStatuses.includes(rep.status);
+
+let matchesDate=false;
+
+if(daysLimit>0){
+
+const leadDate=new Date(rep.updatedAt);
+
+const cutoffDate=new Date();
+
+cutoffDate.setDate(cutoffDate.getDate()-daysLimit);
+
+if(leadDate<cutoffDate){
+matchesDate=true;
+}
+
+}
+
+if(matchesStatus || matchesDate){
+
+if(!clientSideArchiveList.includes(rep._id)){
+clientSideArchiveList.push(rep._id);
+archiveCounter++;
+}
+
+}
+
+});
+
+localStorage.setItem(
+'adminWorkspaceArchive',
+JSON.stringify(clientSideArchiveList)
+);
+
+alert(`🧹 Cleaned! ${archiveCounter} rows archived.`);
+
+closeArchiveModal();
+
+filterReports();
+
+}
+
+async function forceKillSession(empId){
+
+if(!confirm("Device lock clear karna chahte hain?")) return;
+
+try{
+
+const res=await fetch(`/api/employees/clear-device-lock/${empId}`,{
+method:'PUT'
+});
+
+if(res.ok){
+alert("🔓 Device lock removed!");
+loadAdminData();
+}else{
+alert("Unable to clear lock.");
+}
+
+}catch(err){
+alert("Server error.");
+}
+
+}
+
+function downloadReportExcel(){
+
+if(typeof XLSX==='undefined'){
+return alert('❌ XLSX library load nahi hui!');
+}
+
+if(filteredReportsGlobal.length===0){
+return alert('No data available!');
+}
+
+const activeUnarchivedExcel=filteredReportsGlobal.filter(
+rep=>!clientSideArchiveList.includes(rep._id)
+);
+
+const excelRows=activeUnarchivedExcel.map(rep=>({
+"Employee Name":rep.employeeId ? rep.employeeId.name : 'N/A',
+"Source Sheet":rep.documentId ? rep.documentId.fileName : 'N/A',
+"Customer Name":rep.customerName,
+"Customer Phone":rep.customerPhone,
+"Status":rep.status,
+"Remarks":rep.remarks || '',
+"Date Time Logged":new Date(rep.updatedAt).toLocaleString()
+}));
+
+const worksheet=XLSX.utils.json_to_sheet(excelRows);
+
+const workbook=XLSX.utils.book_new();
+
+XLSX.utils.book_append_sheet(
+workbook,
+worksheet,
+"Calling Reports"
+);
+
+XLSX.writeFile(
+workbook,
+`CRM_Report_${new Date().toISOString().slice(0,10)}.xlsx`
+);
+
+}
+
+const addEmpForm=document.getElementById('addEmpForm');
+
+if(addEmpForm){
+
+addEmpForm.addEventListener('submit',async(e)=>{
+
+e.preventDefault();
+
+const name=document.getElementById('empName').value;
+const email=document.getElementById('empEmail').value;
+const password=document.getElementById('empPass').value;
+
+try{
+
+const res=await fetch('/api/employees/add',{
+
+method:'POST',
+
+headers:{
+'Content-Type':'application/json'
+},
+
+body:JSON.stringify({
+adminId:adminInfo.id,
+name,
+email,
+password
+})
+
+});
+
+if(res.ok){
+
+alert('🎉 Employee Created Successfully!');
+
+addEmpForm.reset();
+
+initAdminDashboard();
+
+}else{
+
+const errData=await res.json().catch(()=>({}));
+
+alert(errData.message || 'Error creating employee');
+
+}
+
+}catch(error){
+
+console.error(error);
+
+alert("Server connection error!");
+
+}
+
+});
+
+}
+
+async function changePassword(empId){
+
+const passInput=document.getElementById(`pass-${empId}`);
+
+const newPassword=passInput ? passInput.value : '';
+
+if(!newPassword){
+return alert('Please enter password!');
+}
+
+const res=await fetch(`/api/employees/update-password/${empId}`,{
+
+method:'PUT',
+
+headers:{
+'Content-Type':'application/json'
+},
+
+body:JSON.stringify({newPassword})
+
+});
+
+if(res.ok){
+
+alert('🔑 Password changed!');
+
+loadAdminData();
+
+}
+
+}
+
+async function toggleAccess(empId,currentStatus){
+
+const nextStatus=currentStatus==='Active'
+? 'Suspended'
+: 'Active';
+
+if(!confirm(`Make employee ${nextStatus}?`)) return;
+
+const res=await fetch(`/api/employees/toggle-status/${empId}`,{
+
+method:'PUT',
+
+headers:{
+'Content-Type':'application/json'
+},
+
+body:JSON.stringify({
+status:nextStatus
+})
+
+});
+
+if(res.ok){
+loadAdminData();
+}
+
+}
+
+async function deleteEmployee(empId){
+
+if(!confirm('🚨 Delete employee permanently?')) return;
+
+const res=await fetch(`/api/employees/delete/${empId}`,{
+method:'DELETE'
+});
+
+if(res.ok){
+
+alert('🗑️ Employee deleted!');
+
+initAdminDashboard();
+
+}
+
+}
+
+function logout(){
+
+if(confirm("Logout karna chahte hain?")){
+
+localStorage.removeItem('adminInfo');
+
+sessionStorage.clear();
+
+window.location.href='/admin-login.html';
+
+}
+
+}
 </script>
 </body>
 </html>

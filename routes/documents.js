@@ -13,14 +13,20 @@ const Document = require('../models/Document');
 const LeadStatus = require('../models/LeadStatus');
 
 // =======================================================
-// MULTER STORAGE
+// MULTER STORAGE (UPDATED)
 // =======================================================
 
+const uploadDir = './public/uploads/';
+
+// Folder check and create if missing
+if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
+}
+
 const storage = multer.diskStorage({
-    destination: './public/uploads/',
+    destination: uploadDir,
 
     filename: function (req, file, cb) {
-
         const uniqueName =
             file.fieldname +
             '-' +
@@ -34,7 +40,6 @@ const storage = multer.diskStorage({
 });
 
 const upload = multer({ storage });
-
 // =======================================================
 // 1. UPLOAD + SPLIT + ASSIGN
 // =======================================================
