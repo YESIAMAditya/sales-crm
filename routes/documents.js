@@ -36,310 +36,79 @@ const storage = multer.diskStorage({
 const upload = multer({ storage });
 
 // =======================================================
-// 1. UPLOAD + SPLIT + ASSIGN
+// 1. UPLOAD + SPLIT + ASSIGN (OPTIMIZED VERSION)
 // =======================================================
-
 router.post('/upload', upload.single('myFile'), async (req, res) => {
-
     try {
+        const { adminId, employeeId, selectedEmployees } = req.body;
 
-        const { adminId, employeeId } = req.body;
+        // 1. Basic Validation
+        if (!req.file) return res.status(400).json({ message: 'Excel file upload karna zaroori hai!' });
+        if (!mongoose.Types.ObjectId.isValid(adminId)) return res.status(400).json({ message: 'Invalid Admin ID' });
 
-        // -----------------------------------------------
-        // VALIDATE FILE
-        // -----------------------------------------------
+        const adminObjId = new mongoose.Types.ObjectId(adminId);
 
-        if (!req.file) {
-            return res.status(400).json({
-                message: 'Please upload an excel file'
-            });
-        }
+        // 2. SPLIT EQUALLY MODE
+        if (employeeId === "SPLIT_EQUALLY" && selectedEmployees) {
+            const empIds = JSON.parse(selectedEmployees);
+            
+            // Excel Read karein
+            const workbook = xlsx.readFile(req.file.path);
+            const sheetName = workbook.SheetNames[0];
+            const sheetData = xlsx.utils.sheet_to_json(workbook.Sheets[sheetName]);
 
-        // -----------------------------------------------
-        // VALIDATE ADMIN
-        // -----------------------------------------------
+            if (sheetData.length === 0) return res.status(400).json({ message: 'Excel file khali hai!' });
 
-        if (!mongoose.Types.ObjectId.isValid(adminId)) {
-
-            return res.status(400).json({
-                message: 'Invalid Admin ID'
-            });
-        }
-
-        const validAdminId =
-            new mongoose.Types.ObjectId(adminId);
-
-        // -----------------------------------------------
-        // PARSE SELECTED EMPLOYEES
-        // -----------------------------------------------
-
-        let selectedEmployees = [];
-
-        if (req.body.selectedEmployees) {
-
-            try {
-
-                selectedEmployees =
-                    JSON.parse(req.body.selectedEmployees);
-
-            } catch (err) {
-
-                selectedEmployees =
-                    req.body.selectedEmployees;
-            }
-        }
-
-        const originalFilePath = req.file.path;
-
-        const ext =
-            path.extname(req.file.originalname);
-
-        // ===================================================
-        // SPLIT EQUALLY MODE
-        // ===================================================
-
-        if (
-            employeeId === "SPLIT_EQUALLY" &&
-            Array.isArray(selectedEmployees) &&
-            selectedEmployees.length > 0
-        ) {
-
-            // -----------------------------------------------
-            // READ EXCEL FILE
-            // -----------------------------------------------
-
-            const workbook =
-                xlsx.readFile(originalFilePath);
-
-            const sheetName =
-                workbook.SheetNames[0];
-
-            const worksheet =
-                workbook.Sheets[sheetName];
-
-            const sheetData =
-                xlsx.utils.sheet_to_json(worksheet);
-
-            // -----------------------------------------------
-            // EMPTY FILE CHECK
-            // -----------------------------------------------
-
-            if (!sheetData || sheetData.length === 0) {
-
-                return res.status(400).json({
-                    message: 'Excel file is empty'
-                });
-            }
-
-            // -----------------------------------------------
-            // SPLIT LOGIC
-            // -----------------------------------------------
-
-            const totalRows =
-                sheetData.length;
-
-            const totalEmployees =
-                selectedEmployees.length;
-
-            const baseChunkSize =
-                Math.floor(totalRows / totalEmployees);
-
-            const extraRows =
-                totalRows % totalEmployees;
-
-            let currentIndex = 0;
-
+            const chunkSize = Math.ceil(sheetData.length / empIds.length);
             const createdDocs = [];
 
-            // -----------------------------------------------
-            // LOOP THROUGH EMPLOYEES
-            // -----------------------------------------------
+            // Har employee ke liye file banayein
+            for (let i = 0; i < empIds.length; i++) {
+                const chunk = sheetData.slice(i * chunkSize, (i + 1) * chunkSize);
+                if (chunk.length === 0) continue;
 
-            for (let i = 0; i < totalEmployees; i++) {
+                // Nayi Excel file create karein
+                const newWB = xlsx.utils.book_new();
+                xlsx.utils.book_append_sheet(newWB, xlsx.utils.json_to_sheet(chunk), "AssignedLeads");
+                
+                const uniqueFileName = `split-${i}-${Date.now()}-${Math.floor(Math.random()*1000)}.xlsx`;
+                const filePath = path.join('./public/uploads/', uniqueFileName);
+                
+                xlsx.writeFile(newWB, filePath);
 
-                const empId =
-                    selectedEmployees[i];
-
-                // INVALID ID SKIP
-                if (!mongoose.Types.ObjectId.isValid(empId)) {
-                    continue;
-                }
-
-                // PERFECT BALANCED SPLIT
-                const currentChunkSize =
-                    baseChunkSize +
-                    (i < extraRows ? 1 : 0);
-
-                const empChunkData =
-                    sheetData.slice(
-                        currentIndex,
-                        currentIndex + currentChunkSize
-                    );
-
-                currentIndex += currentChunkSize;
-
-                // SKIP EMPTY
-                if (empChunkData.length === 0) {
-                    continue;
-                }
-
-                // -------------------------------------------
-                // CREATE NEW EXCEL FILE
-                // -------------------------------------------
-
-                const newWorksheet =
-                    xlsx.utils.json_to_sheet(empChunkData);
-
-                const newWorkbook =
-                    xlsx.utils.book_new();
-
-                xlsx.utils.book_append_sheet(
-                    newWorkbook,
-                    newWorksheet,
-                    sheetName
-                );
-
-                // -------------------------------------------
-                // UNIQUE FILE NAME
-                // -------------------------------------------
-
-                const uniqueChunkName =
-                    `split-${i}-${Date.now()}-${Math.random()
-                        .toString(36)
-                        .substring(2, 8)}${ext}`;
-
-                const chunkFilePath =
-                    path.join(
-                        './public/uploads/',
-                        uniqueChunkName
-                    );
-
-                // SAVE PHYSICAL FILE
-                xlsx.writeFile(
-                    newWorkbook,
-                    chunkFilePath
-                );
-
-                // -------------------------------------------
-                // SAVE DOCUMENT ENTRY
-                // -------------------------------------------
-
-                const splitDoc =
-                    new Document({
-
-                        adminId: validAdminId,
-
-                        employeeId:
-                            new mongoose.Types.ObjectId(empId),
-
-                        fileName:
-                            `${i + 1}_Part_${req.file.originalname}`,
-
-                        filePath:
-                            `/uploads/${uniqueChunkName}`
-                    });
-
-                const savedDoc =
-                    await splitDoc.save();
-
-                createdDocs.push(savedDoc);
+                // Database mein entry daalein
+                const newDoc = await Document.create({
+                    adminId: adminObjId,
+                    employeeId: new mongoose.Types.ObjectId(empIds[i]),
+                    fileName: `Part_${i + 1}_${req.file.originalname}`,
+                    filePath: `/uploads/${uniqueFileName}`
+                });
+                createdDocs.push(newDoc);
             }
 
-            // -----------------------------------------------
-            // DELETE ORIGINAL FILE
-            // -----------------------------------------------
+            // Original badi file ko delete karein
+            if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+            
+            return res.status(201).json({ success: true, message: `Data successfully split into ${createdDocs.length} files.` });
+        } 
 
-            try {
-
-                if (fs.existsSync(originalFilePath)) {
-
-                    fs.unlinkSync(originalFilePath);
-                }
-
-            } catch (deleteError) {
-
-                console.log(
-                    "Original file delete error:",
-                    deleteError
-                );
-            }
-
-            // -----------------------------------------------
-            // SUCCESS RESPONSE
-            // -----------------------------------------------
-
-            return res.status(201).json({
-
-                success: true,
-
-                message:
-                    `Excel split successfully among ${createdDocs.length} employees`,
-
-                totalRows,
-
-                totalEmployees,
-
-                filesCreated:
-                    createdDocs.length
-            });
-        }
-
-        // ===================================================
-        // SINGLE EMPLOYEE MODE
-        // ===================================================
-
+        // 3. SINGLE EMPLOYEE MODE (Normal Upload)
         else {
+            if (!mongoose.Types.ObjectId.isValid(employeeId)) return res.status(400).json({ message: 'Invalid Employee ID' });
 
-            if (!mongoose.Types.ObjectId.isValid(employeeId)) {
-
-                return res.status(400).json({
-                    message: 'Invalid Employee ID'
-                });
-            }
-
-            const validEmployeeId =
-                new mongoose.Types.ObjectId(employeeId);
-
-            const newDoc =
-                new Document({
-
-                    adminId: validAdminId,
-
-                    employeeId:
-                        validEmployeeId,
-
-                    fileName:
-                        req.file.originalname,
-
-                    filePath:
-                        `/uploads/${req.file.filename}`
-                });
-
-            await newDoc.save();
-
-            return res.status(201).json({
-
-                success: true,
-
-                message:
-                    'Document uploaded successfully'
+            await Document.create({
+                adminId: adminObjId,
+                employeeId: new mongoose.Types.ObjectId(employeeId),
+                fileName: req.file.originalname,
+                filePath: `/uploads/${req.file.filename}`
             });
+
+            return res.status(201).json({ success: true, message: 'Document assigned successfully.' });
         }
 
     } catch (error) {
-
-        console.error(
-            "UPLOAD ROUTE ERROR:",
-            error
-        );
-
-        return res.status(500).json({
-
-            success: false,
-
-            message:
-                'Server Error in upload route'
-        });
+        console.error("UPLOAD ERROR:", error);
+        return res.status(500).json({ success: false, message: 'Server Error during upload.' });
     }
 });
 
