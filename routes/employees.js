@@ -1,188 +1,196 @@
-// routes/employees.js (FULLY OPTIMIZED WITH SUPER ADMIN CONTROLS, DEBUGGERS & LIVE SESSION TRACKING)
+// routes/employees.js
 const express = require('express');
 const router = express.Router();
-const mongoose = require('mongoose'); // 🔥 ID Validation ke liye import kiya hai
-const Employee = require('../models/Employee');
-const Admin = require('../models/Admin'); 
-const bcrypt = require('bcryptjs'); 
-const jwt = require('jsonwebtoken'); 
+const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 
-// 1. ADMIN APNE EMPLOYEE KI ID-PASSWORD GENERATE KAREGA (WITH STRICT LIMIT & BLOCK CHECKS)
+const Employee = require('../models/Employee');
+const Admin = require('../models/Admin');
+
+// ====================== CONFIG ======================
+const JWT_SECRET = process.env.JWT_SECRET || 'MY_SUPER_SECRET_KEY_12345'; // .env mein daal do
+
+// ====================== CREATE EMPLOYEE ======================
 router.post('/add', async (req, res) => {
     try {
         const { adminId, name, email, password } = req.body;
 
-        // 📝 TERMINAL LOGS: Testing ke waqt VS Code me dekhne ke liye
-        console.log("\n📥 --- Nayi Employee Creation Request Aayi Hai ---");
-        console.log("Received AdminID:", adminId);
-        console.log("Employee Name:", name);
-
-        if (!adminId) {
-            console.log("❌ Filter Block: Request me adminId missing hai!");
-            return res.status(400).json({ message: 'Admin ID is missing from frontend request!' });
+        if (!adminId || !name || !email || !password) {
+            return res.status(400).json({ success: false, message: 'All fields are required' });
         }
 
-        let formattedAdminId;
-        try {
-            formattedAdminId = new mongoose.Types.ObjectId(adminId);
-        } catch (idErr) {
-            console.log("❌ Filter Block: Admin ID ka format invalid hai!");
-            return res.status(400).json({ message: 'Invalid Admin ID Format! Login again.' });
+        if (!mongoose.Types.ObjectId.isValid(adminId)) {
+            return res.status(400).json({ success: false, message: 'Invalid Admin ID' });
         }
 
-        const adminInfo = await Admin.findById(formattedAdminId);
-        if (!adminInfo) {
-            console.log("❌ Filter Block: Database me is ID ka koi admin nahi mila.");
-            return res.status(444).json({ message: 'Admin Profile Not Found in Database!' });
+        const admin = await Admin.findById(adminId);
+        if (!admin) {
+            return res.status(404).json({ success: false, message: 'Admin not found' });
         }
 
-        if (adminInfo.isBlocked) {
-            console.log(`🛑 Filter Block: ${adminInfo.companyName} is Currently Banned/Blocked!`);
-            return res.status(403).json({ 
-                message: '❌ Your Admin Account is suspended! Please contact Super Admin to activate.' 
-            });
+        if (admin.isBlocked) {
+            return res.status(403).json({ success: false, message: 'Your admin account is suspended' });
         }
 
-        const currentEmployeesCount = await Employee.countDocuments({ adminId: adminInfo._id });
-        console.log(`📊 Stats for ${adminInfo.companyName} -> Current Employees: ${currentEmployeesCount} | Max Allowed Limit: ${adminInfo.employeeLimit}`);
-
-        if (currentEmployeesCount >= adminInfo.employeeLimit) {
-            console.log("❌ Filter Block: Admin ki employee limit cross ho gayi hai!");
+        // Employee Limit Check
+        const currentCount = await Employee.countDocuments({ adminId });
+        if (currentCount >= admin.employeeLimit) {
             return res.status(400).json({ 
-                message: `❌ Limit Reached! Your plan allows only ${adminInfo.employeeLimit} employees. Contact Super Admin to upgrade.` 
+                success: false, 
+                message: `Employee limit reached (${admin.employeeLimit}). Contact Super Admin.` 
             });
         }
 
-        let empExists = await Employee.findOne({ email });
-        if (empExists) {
-            console.log("❌ Filter Block: Email pehle se register hai.");
-            return res.status(400).json({ message: 'Employee with this email already exists!' });
+        // Email uniqueness
+        const existingEmp = await Employee.findOne({ email: email.toLowerCase() });
+        if (existingEmp) {
+            return res.status(400).json({ success: false, message: 'Email already exists' });
         }
 
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
 
-        const newEmployee = new Employee({
-            adminId: adminInfo._id, 
-            name,
-            email,
-            password: hashedPassword
+        const newEmployee = await Employee.create({
+            adminId,
+            name: name.trim(),
+            email: email.toLowerCase().trim(),
+            password: hashedPassword,
+            status: 'Active'
         });
 
-        await newEmployee.save();
-        console.log("✅ SUCCESS: Employee Account Created Successfully!");
-        
-        res.status(201).json({ 
-            message: '🚀 Employee Account Created Successfully!', 
-            employee: { name, email } 
+        res.status(201).json({
+            success: true,
+            message: 'Employee created successfully',
+            employee: { id: newEmployee._id, name: newEmployee.name, email: newEmployee.email }
         });
 
     } catch (error) {
-        console.error("💥 CATCH BLOCK SERVER ERROR:", error.message);
-        res.status(500).json({ message: 'Backend Server Error: ' + error.message });
+        console.error("Employee Add Error:", error);
+        res.status(500).json({ success: false, message: 'Server error while creating employee' });
     }
 });
 
-// 2. ADMIN KO USKE SAARE EMPLOYEES KI LIST DIKHANE KE LIYE
+// ====================== GET ALL EMPLOYEES (ADMIN) ======================
 router.get('/all/:adminId', async (req, res) => {
     try {
-        const employees = await Employee.find({ adminId: req.params.adminId }).select('-password').sort({ createdAt: -1 });
+        if (!mongoose.Types.ObjectId.isValid(req.params.adminId)) {
+            return res.status(400).json({ success: false, message: 'Invalid Admin ID' });
+        }
+
+        const employees = await Employee.find({ adminId: req.params.adminId })
+            .select('-password')
+            .sort({ createdAt: -1 });
+
         res.json(employees);
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Server Error in fetching employees' });
+        res.status(500).json({ success: false, message: 'Error fetching employees' });
     }
 });
 
-// 3. EMPLOYEE LOGIN ROUTE (UPDATED WITH DEVICE LOCK & ONLINE LOCK)
+// ====================== EMPLOYEE LOGIN ======================
 router.post('/login', async (req, res) => {
     try {
         const { email, password } = req.body;
 
-        const employee = await Employee.findOne({ email });
+        const employee = await Employee.findOne({ email: email.toLowerCase() });
         if (!employee) {
-            return res.status(400).json({ message: 'Invalid Email or Password!' });
+            return res.status(400).json({ success: false, message: 'Invalid credentials' });
         }
 
         if (employee.status === 'Suspended') {
-            return res.status(403).json({ message: 'Your account has been suspended by your Admin.' });
+            return res.status(403).json({ success: false, message: 'Account suspended by admin' });
         }
 
         const isMatch = await bcrypt.compare(password, employee.password);
         if (!isMatch) {
-            return res.status(400).json({ message: 'Invalid Email or Password!' });
+            return res.status(400).json({ success: false, message: 'Invalid credentials' });
         }
 
-        // 🔑 Generate JWT Token
         const token = jwt.sign(
             { id: employee._id, role: 'Employee' },
-            'MY_SUPER_SECRET_KEY_12345',
-            { expiresIn: '1d' }
+            JWT_SECRET,
+            { expiresIn: '24h' }
         );
 
-        // 🔒 SECURITY UPDATE: Database me status Online set karna aur token lock lagana
+        // Update session
         employee.isOnline = true;
-        employee.currentSessionToken = token; 
+        employee.currentSessionToken = token;
         await employee.save();
 
         res.json({
+            success: true,
             token,
-            employee: { id: employee._id, name: employee.name, email: employee.email }
+            employee: {
+                id: employee._id,
+                name: employee.name,
+                email: employee.email
+            }
         });
+
     } catch (error) {
-        res.status(500).json({ message: 'Server Error in employee login' });
+        console.error(error);
+        res.status(500).json({ success: false, message: 'Login failed' });
     }
 });
 
-// 🔒 NEW ROUTE: EMPLOYEE LOGOUT (STATUS CLEANUP FOR BACK-BUTTON & LIVE UPDATE)
+// ====================== EMPLOYEE LOGOUT ======================
 router.post('/logout', async (req, res) => {
     try {
         const { employeeId } = req.body;
-        if (employeeId) {
-            // Logout hote hi database me offline mark kar do aur session lock tod do
-            await Employee.findByIdAndUpdate(employeeId, { 
-                isOnline: false, 
-                currentSessionToken: null 
+        if (employeeId && mongoose.Types.ObjectId.isValid(employeeId)) {
+            await Employee.findByIdAndUpdate(employeeId, {
+                isOnline: false,
+                currentSessionToken: null
             });
         }
-        res.json({ message: 'Logged out successfully' });
+        res.json({ success: true, message: 'Logged out successfully' });
     } catch (error) {
-        res.status(500).json({ message: 'Server Error during logout' });
+        res.status(500).json({ success: false, message: 'Logout error' });
     }
 });
 
-// 4. ADMIN EMPLOYEE KA PASSWORD CHANGE KAREGA
+// ====================== UPDATE PASSWORD ======================
 router.put('/update-password/:empId', async (req, res) => {
     try {
         const { newPassword } = req.body;
+        if (!newPassword || newPassword.length < 6) {
+            return res.status(400).json({ success: false, message: 'Password must be at least 6 characters' });
+        }
+
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(newPassword, salt);
 
         await Employee.findByIdAndUpdate(req.params.empId, { password: hashedPassword });
-        res.json({ message: 'Employee password updated successfully!' });
+
+        res.json({ success: true, message: 'Password updated successfully' });
     } catch (error) {
-        res.status(500).json({ message: 'Error updating password' });
+        res.status(500).json({ success: false, message: 'Error updating password' });
     }
 });
 
-// 5. ADMIN EMPLOYEE KA ACCESS CHANGE KAREGA (ACTIVE / SUSPEND)
+// ====================== TOGGLE STATUS ======================
 router.put('/toggle-status/:empId', async (req, res) => {
     try {
-        const { status } = req.body; 
+        const { status } = req.body;
+        if (!['Active', 'Suspended'].includes(status)) {
+            return res.status(400).json({ success: false, message: 'Invalid status' });
+        }
+
         await Employee.findByIdAndUpdate(req.params.empId, { status });
-        res.json({ message: `Employee status changed to ${status}!` });
+        res.json({ success: true, message: `Employee status changed to ${status}` });
     } catch (error) {
-        res.status(500).json({ message: 'Error changing status' });
+        res.status(500).json({ success: false, message: 'Error updating status' });
     }
 });
 
-// 6. ADMIN EMPLOYEE KO DELETE KAREGA
+// ====================== DELETE EMPLOYEE ======================
 router.delete('/delete/:empId', async (req, res) => {
     try {
         await Employee.findByIdAndDelete(req.params.empId);
-        res.json({ message: 'Employee account deleted permanently!' });
+        res.json({ success: true, message: 'Employee deleted successfully' });
     } catch (error) {
-        res.status(500).json({ message: 'Error deleting employee' });
+        res.status(500).json({ success: false, message: 'Error deleting employee' });
     }
 });
 
