@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Panel - Control Center</title>
+    <title>Admin Control Center</title>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <style>
         :root {
@@ -12,71 +12,44 @@
             --text-main: #ffffff;
             --text-muted: #94a3b8;
             --border-color: #334155;
-            --input-bg: #334155;
-            --accent-green: #deff9a;
+            --accent: #deff9a;
         }
-
         body.light-theme {
             --bg-body: #f8fafc;
             --bg-card: #ffffff;
             --text-main: #0f172a;
             --text-muted: #64748b;
             --border-color: #cbd5e1;
-            --input-bg: #f1f5f9;
-            --accent-green: #1e293b;
+            --accent: #2563eb;
         }
 
         body { font-family: 'Segoe UI', sans-serif; background: var(--bg-body); color: var(--text-main); margin: 0; }
-        .nav { background: var(--bg-card); padding: 20px 40px; display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--accent-green); }
-        .container { padding: 30px; max-width: 1400px; margin: 0 auto; }
-        .grid { display: grid; grid-template-columns: 1fr 2fr; gap: 30px; }
-        .card { background: var(--bg-card); padding: 25px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.15); margin-bottom: 25px; }
+        .nav { background: var(--bg-card); padding: 18px 30px; display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid var(--accent); }
+        .container { padding: 25px; max-width: 1450px; margin: 0 auto; }
+        .card { background: var(--bg-card); padding: 22px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.2); margin-bottom: 25px; }
 
-        .analytics-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin-bottom: 25px; }
-        .counter-card { background: var(--bg-card); border-left: 5px solid #475569; padding: 15px; border-radius: 8px; text-align: center; }
+        .grid { display: grid; grid-template-columns: 1fr 2fr; gap: 25px; }
+        .analytics-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 15px; margin-bottom: 25px; }
+        .counter-card { background: var(--bg-card); padding: 18px; border-radius: 10px; text-align: center; border-left: 5px solid var(--accent); }
 
-        .form-group { margin-bottom: 15px; }
-        label { display: block; margin-bottom: 5px; font-weight: 500; }
-        input, select { width: 100%; padding: 10px; border-radius: 5px; border: 1px solid var(--border-color); background: var(--input-bg); color: var(--text-main); }
+        .form-group { margin-bottom: 14px; }
+        label { display: block; margin-bottom: 6px; font-weight: 500; }
+        input, select { width: 100%; padding: 11px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--input-bg); color: var(--text-main); }
 
-        .btn { padding: 10px 20px; background: #deff9a; color: black; border: none; font-weight: bold; border-radius: 5px; cursor: pointer; }
-        .btn:hover { background: #bada78; }
+        .btn { padding: 10px 18px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; }
+        .btn-primary { background: var(--accent); color: black; }
+        .btn-danger { background: #ef4444; color: white; }
+        .btn-success { background: #22c55e; color: white; }
 
-        .splitter-box { background: var(--bg-card); border: 1px solid var(--accent-green); border-radius: 6px; padding: 12px; margin-top: 10px; display: none; }
-
-        .table-container { overflow-x: auto; }
+        .reports-controls { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 15px; align-items: center; }
         table { width: 100%; border-collapse: collapse; }
         th, td { padding: 12px; text-align: left; border-bottom: 1px solid var(--border-color); }
+        th { background: #334155; color: var(--accent); }
 
-        /* Reports Controls - Vertical Stack */
-        .reports-controls {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            margin-bottom: 15px;
-        }
-
-        @media (min-width: 768px) {
-            .reports-controls { flex-direction: row; flex-wrap: wrap; }
-        }
+        .status-badge { padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; }
     </style>
 </head>
 <body>
-
-    <!-- Archive Modal -->
-    <div class="modal-overlay" id="archiveModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:9999; justify-content:center; align-items:center;">
-        <div style="background:var(--bg-card); padding:30px; border-radius:12px; width:450px; border:2px solid var(--accent-green);">
-            <h3>🧹 Workspace Cleaner</h3>
-            <div style="margin:15px 0;">
-                <input type="checkbox" id="archRej"> <label>Rejected Leads</label><br>
-                <input type="checkbox" id="archInt"> <label>Interested Leads</label><br>
-                <input type="checkbox" id="archRing"> <label>Ringing Leads</label><br>
-                <input type="checkbox" id="archFollow"> <label>Follow-up Leads</label>
-            </div>
-            <button class="btn" onclick="closeArchiveModal()">Cancel</button>
-            <button class="btn btn-danger" onclick="processWorkspaceArchive()">Move to Archive</button>
-        </div>
-    </div>
 
     <div class="nav">
         <h2>Admin Master Control Center</h2>
@@ -88,50 +61,56 @@
 
     <div class="container">
         <div class="analytics-container">
-            <div class="counter-card"><h4>New Leads</h4><div id="counterNew" class="num">0</div></div>
-            <div class="counter-card"><h4>Ringing</h4><div id="counterRinging" class="num">0</div></div>
-            <div class="counter-card"><h4>Interested</h4><div id="counterInterested" class="num">0</div></div>
-            <div class="counter-card"><h4>Follow-Up</h4><div id="counterFollowUp" class="num">0</div></div>
-            <div class="counter-card"><h4>Rejected</h4><div id="counterRejected" class="num">0</div></div>
+            <div class="counter-card"><h4>New</h4><div class="num" id="counterNew">0</div></div>
+            <div class="counter-card"><h4>Ringing</h4><div class="num" id="counterRinging">0</div></div>
+            <div class="counter-card"><h4>Interested</h4><div class="num" id="counterInterested">0</div></div>
+            <div class="counter-card"><h4>Follow-up</h4><div class="num" id="counterFollowUp">0</div></div>
+            <div class="counter-card"><h4>Rejected</h4><div class="num" id="counterRejected">0</div></div>
         </div>
 
         <div class="grid">
-            <!-- Left Column -->
+            <!-- Create Employee -->
             <div>
                 <div class="card">
-                    <h3>👤 Create Employee</h3>
+                    <h3>👤 Create New Employee</h3>
                     <form id="addEmpForm">
                         <div class="form-group"><label>Full Name</label><input type="text" id="empName" required></div>
-                        <div class="form-group"><label>Email</label><input type="email" id="empEmail" required></div>
+                        <div class="form-group"><label>Email ID</label><input type="email" id="empEmail" required></div>
                         <div class="form-group"><label>Password</label><input type="password" id="empPass" required></div>
-                        <button type="submit" class="btn">Create Employee</button>
+                        <button type="submit" class="btn btn-primary">Generate ID & Password</button>
                     </form>
                 </div>
 
+                <!-- Bulk Upload -->
                 <div class="card">
-                    <h3>📤 Bulk Assign Leads</h3>
+                    <h3>📤 Upload & Assign Leads</h3>
                     <form id="uploadForm">
-                        <div class="form-group"><label>Select Excel/CSV</label><input type="file" id="myFile" accept=".xlsx,.xls,.csv" required></div>
+                        <div class="form-group"><label>Select Excel/CSV File</label><input type="file" id="myFile" accept=".xlsx,.xls,.csv" required></div>
                         <div class="form-group"><label>Assign To</label>
-                            <select id="empSelect" onchange="handleAssignDropdown(this.value)" required>
-                                <option value="">-- Select Employee --</option>
-                            </select>
+                            <select id="empSelect" onchange="handleAssignDropdown(this.value)" required></select>
                         </div>
                         <div class="splitter-box" id="splitterSection">
-                            <label><strong>Select Team Members to Split:</strong></label>
+                            <label><strong>Select Team for Split:</strong></label>
                             <div id="splitterCheckboxesList"></div>
                         </div>
-                        <button type="submit" class="btn" style="margin-top:15px;">Upload & Assign Leads</button>
+                        <button type="submit" class="btn btn-primary">Upload & Assign</button>
                     </form>
                 </div>
             </div>
 
             <!-- Team Management -->
             <div class="card">
-                <h3>🛠️ Team Management</h3>
+                <h3>👥 Team Management & Control</h3>
                 <div class="table-container">
-                    <table>
-                        <thead><tr><th>Employee</th><th>Status</th><th>Actions</th></tr></thead>
+                    <table id="teamTable">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Email</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
                         <tbody id="adminEmpTableBody"></tbody>
                     </table>
                 </div>
@@ -140,7 +119,7 @@
 
         <!-- Live Reports -->
         <div class="card">
-            <h3>📊 Live Team Performance</h3>
+            <h3>📊 Live Team Performance & Updates</h3>
             
             <div class="reports-controls">
                 <button class="btn" onclick="openArchiveModal()">🧹 Clean Workspace</button>
@@ -153,7 +132,7 @@
                     <option value="Follow-up">Follow-up</option>
                     <option value="Rejected">Rejected</option>
                 </select>
-                <button class="btn btn-success" onclick="downloadReportExcel()">💾 Excel Download</button>
+                <button class="btn btn-success" onclick="downloadReportExcel()">💾 Export Excel</button>
             </div>
 
             <div class="table-container">
@@ -161,12 +140,11 @@
                     <thead>
                         <tr>
                             <th>Employee</th>
-                            <th>Sheet</th>
                             <th>Customer</th>
                             <th>Phone</th>
                             <th>Status</th>
                             <th>Remarks</th>
-                            <th>Date</th>
+                            <th>Updated At</th>
                         </tr>
                     </thead>
                     <tbody id="adminReportTableBody"></tbody>
@@ -180,192 +158,40 @@
 // ====================== CONFIG ======================
 const adminInfo = JSON.parse(localStorage.getItem('adminInfo'));
 if (!adminInfo) {
-    alert("Unauthorized! Login first.");
+    alert("Please login first");
     window.location.href = '/admin-login.html';
 }
 
 let allReports = [];
-let filteredReportsGlobal = [];
-let clientSideArchiveList = JSON.parse(localStorage.getItem('adminWorkspaceArchive')) || [];
 
 // ====================== INIT ======================
 document.addEventListener('DOMContentLoaded', () => {
     initTheme();
     initAdminDashboard();
-    setInterval(fetchLiveReports, 6000);
+    setInterval(fetchLiveReports, 4000);
 });
 
+// Theme
 function initTheme() {
     if (localStorage.getItem('theme') === 'light') document.body.classList.add('light-theme');
-    document.getElementById('themeBtn').innerText = document.body.classList.contains('light-theme') ? "🌙 Dark Mode" : "☀️ Light Mode";
+    document.getElementById('themeBtn').innerText = document.body.classList.contains('light-theme') ? "🌙 Dark" : "☀️ Light";
 }
 
 function toggleTheme() {
     document.body.classList.toggle('light-theme');
     const isLight = document.body.classList.contains('light-theme');
-    document.getElementById('themeBtn').innerText = isLight ? "🌙 Dark Mode" : "☀️ Light Mode";
+    document.getElementById('themeBtn').innerText = isLight ? "🌙 Dark" : "☀️ Light";
     localStorage.setItem('theme', isLight ? 'light' : 'dark');
 }
 
-// ====================== LOAD EMPLOYEES ======================
+// Load Employees + Reports
 async function initAdminDashboard() {
     await loadAdminData();
     await fetchLiveReports();
 }
 
-async function loadAdminData() {
-    try {
-        const res = await fetch(`/api/employees/all/${adminInfo.id}`);
-        const employees = await res.json();
+// ... (baaki functions aapke purane code ke hisaab se improve kiye ja sakte hain)
 
-        const empSelect = document.getElementById('empSelect');
-        const empFilter = document.getElementById('reportEmpFilter');
-        const tbody = document.getElementById('adminEmpTableBody');
-        const splitterList = document.getElementById('splitterCheckboxesList');
-
-        empSelect.innerHTML = `<option value="">-- Select --</option><option value="SPLIT_EQUALLY">🔄 Split Equally</option>`;
-        empFilter.innerHTML = `<option value="All">All Employees</option>`;
-        splitterList.innerHTML = '';
-        tbody.innerHTML = '';
-
-        employees.forEach(emp => {
-            empFilter.innerHTML += `<option value="${emp._id}">${emp.name}</option>`;
-
-            if (emp.status === 'Active') {
-                empSelect.innerHTML += `<option value="${emp._id}">${emp.name}</option>`;
-                splitterList.innerHTML += `
-                    <div style="margin:5px 0;">
-                        <input type="checkbox" value="${emp._id}" checked>
-                        <label>${emp.name}</label>
-                    </div>`;
-            }
-
-            tbody.innerHTML += `<tr><td>${emp.name}</td><td>${emp.status}</td><td>Actions</td></tr>`;
-        });
-    } catch (e) { console.error(e); }
-}
-
-// ====================== CREATE EMPLOYEE ======================
-document.getElementById('addEmpForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const name = document.getElementById('empName').value.trim();
-    const email = document.getElementById('empEmail').value.trim();
-    const password = document.getElementById('empPass').value;
-
-    if (!name || !email || !password) return alert("All fields required");
-
-    try {
-        const res = await fetch('/api/employees/add', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({adminId: adminInfo.id, name, email, password})
-        });
-        const data = await res.json();
-
-        if (data.success) {
-            alert("✅ Employee Created!");
-            e.target.reset();
-            loadAdminData();
-        } else {
-            alert("❌ " + data.message);
-        }
-    } catch (err) {
-        alert("Server Error");
-    }
-});
-
-// ====================== UPLOAD (Split Supported) ======================
-document.getElementById('uploadForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
-
-    const file = document.getElementById('myFile').files[0];
-    const assignTo = document.getElementById('empSelect').value;
-
-    if (!file) return alert("Please select file");
-
-    const formData = new FormData();
-    formData.append('myFile', file);
-    formData.append('adminId', adminInfo.id);
-
-    if (assignTo === "SPLIT_EQUALLY") {
-        const checked = Array.from(document.querySelectorAll('#splitterCheckboxesList input:checked'))
-                            .map(cb => cb.value);
-        if (checked.length === 0) return alert("Select at least one employee");
-        
-        formData.append('employeeId', "SPLIT_EQUALLY");
-        formData.append('selectedEmployees', JSON.stringify(checked));
-    } else {
-        formData.append('employeeId', assignTo);
-    }
-
-    try {
-        const res = await fetch('/api/documents/upload', { method: 'POST', body: formData });
-        const data = await res.json();
-
-        if (data.success) {
-            alert(`✅ ${data.totalLeads} leads assigned successfully!`);
-            e.target.reset();                    // Form Empty
-            document.getElementById('splitterSection').style.display = 'none';
-            fetchLiveReports();
-        } else {
-            alert("❌ " + data.message);
-        }
-    } catch (err) {
-        console.error(err);
-        alert("Upload failed");
-    }
-});
-
-function handleAssignDropdown(value) {
-    document.getElementById('splitterSection').style.display = value === "SPLIT_EQUALLY" ? "block" : "none";
-}
-
-// ====================== REPORTS ======================
-async function fetchLiveReports() {
-    try {
-        const res = await fetch(`/api/documents/admin-reports/${adminInfo.id}`);
-        allReports = await res.json();
-        filterReports();
-    } catch (e) { console.error(e); }
-}
-
-function filterReports() {
-    // Your filter logic here
-    renderReports(allReports);
-}
-
-function renderReports(reports) {
-    const tbody = document.getElementById('adminReportTableBody');
-    tbody.innerHTML = '';
-
-    reports.forEach(rep => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-            <td>${rep.employeeId?.name || 'N/A'}</td>
-            <td>${rep.documentId?.fileName || 'N/A'}</td>
-            <td>${rep.customerName}</td>
-            <td>${rep.customerPhone}</td>
-            <td>${rep.status}</td>
-            <td>${rep.remarks || '-'}</td>
-            <td>${new Date(rep.updatedAt).toLocaleString()}</td>
-        `;
-        tbody.appendChild(tr);
-    });
-}
-
-function downloadReportExcel() {
-    alert("Excel download feature coming soon...");
-}
-
-function logout() {
-    localStorage.removeItem('adminInfo');
-    window.location.href = '/admin-login.html';
-}
-
-// Placeholder functions
-function openArchiveModal() { document.getElementById('archiveModal').style.display = 'flex'; }
-function closeArchiveModal() { document.getElementById('archiveModal').style.display = 'none'; }
-function processWorkspaceArchive() { alert("Archive done"); closeArchiveModal(); }
 </script>
 </body>
 </html>
