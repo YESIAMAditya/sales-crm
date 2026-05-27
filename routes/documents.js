@@ -36,72 +36,278 @@ const storage = multer.diskStorage({
 const upload = multer({ storage });
 
 // =======================================================
-// 1. UPLOAD + SPLIT + ASSIGN (OPTIMIZED VERSION)
+// 1. UPLOAD + SPLIT + ASSIGN
 // =======================================================
+
 router.post('/upload', upload.single('myFile'), async (req, res) => {
+
     try {
-        const { adminId, employeeId, selectedEmployees } = req.body;
 
-        // 1. Basic Validation
-        if (!req.file) return res.status(400).json({ message: 'Excel file upload karna zaroori hai!' });
-        if (!mongoose.Types.ObjectId.isValid(adminId)) return res.status(400).json({ message: 'Invalid Admin ID' });
+        const {
+            adminId,
+            employeeId
+        } = req.body;
 
-        const adminObjId = new mongoose.Types.ObjectId(adminId);
+        let selectedEmployees = [];
 
-        // 2. SPLIT EQUALLY MODE
-        if (employeeId === "SPLIT_EQUALLY" && selectedEmployees) {
-            const empIds = JSON.parse(selectedEmployees);
-            
-            // Excel Read karein
-            const workbook = xlsx.readFile(req.file.path);
-            const sheetName = workbook.SheetNames[0];
-            const sheetData = xlsx.utils.sheet_to_json(workbook.Sheets[sheetName]);
+        // Parse selected employees safely
+        if (req.body.selectedEmployees) {
 
-            if (sheetData.length === 0) return res.status(400).json({ message: 'Excel file khali hai!' });
+            try {
 
-            const chunkSize = Math.ceil(sheetData.length / empIds.length);
-            const createdDocs = [];
+                selectedEmployees =
+                    JSON.parse(req.body.selectedEmployees);
 
-            // Har employee ke liye file banayein
-          // Loop ke andar slice check karne ke liye ye logic use karein
-    for (let i = 0; i < empIds.length; i++) {
-    // START index aur END index ko explicitly calculate karein
-    const start = i * chunkSize;
-    const end = (i + 1) * chunkSize;
-    
-    // Yahan console.log karke check karein ki kya har baar alag data slice ho raha hai
-    const chunk = sheetData.slice(start, end);
-    
-    console.log(`Employee ${i} | Range: ${start} to ${end} | Chunk Size: ${chunk.length}`);
+            } catch {
 
-    if (chunk.length === 0) continue;
+                selectedEmployees =
+                    req.body.selectedEmployees;
+            }
+        }
 
-    // ... (rest of your workbook code)
-}
+        // File validation
+        if (!req.file) {
 
-            // Original badi file ko delete karein
-            if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
-            
-            return res.status(201).json({ success: true, message: `Data successfully split into ${createdDocs.length} files.` });
-        } 
+            return res.status(400).json({
+                success: false,
+                message: 'No file uploaded'
+            });
+        }
 
-        // 3. SINGLE EMPLOYEE MODE (Normal Upload)
-        else {
-            if (!mongoose.Types.ObjectId.isValid(employeeId)) return res.status(400).json({ message: 'Invalid Employee ID' });
+        // Admin validation
+        if (
+            !mongoose.Types.ObjectId.isValid(adminId)
+        ) {
 
-            await Document.create({
-                adminId: adminObjId,
-                employeeId: new mongoose.Types.ObjectId(employeeId),
-                fileName: req.file.originalname,
-                filePath: `/uploads/${req.file.filename}`
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid Admin ID'
+            });
+        }
+
+        const validAdminId =
+            new mongoose.Types.ObjectId(adminId);
+
+        const originalFilePath =
+            req.file.path;
+
+        const ext =
+            path.extname(req.file.originalname);
+
+        // ===================================================
+        // SPLIT EQUALLY MODE
+        // ===================================================
+
+        if (
+            employeeId === "SPLIT_EQUALLY" &&
+            Array.isArray(selectedEmployees) &&
+            selectedEmployees.length > 0
+        ) {
+
+            console.log("SPLIT MODE ACTIVATED");
+
+            // Read Excel
+            const workbook =
+                xlsx.readFile(originalFilePath);
+
+            const sheetName =
+                workbook.SheetNames[0];
+
+            const worksheet =
+                workbook.Sheets[sheetName];
+
+            const sheetData =
+                xlsx.utils.sheet_to_json(worksheet);
+
+            if (sheetData.length === 0) {
+
+                return res.status(400).json({
+                    success: false,
+                    message: 'Excel file empty'
+                });
+            }
+
+            const totalRows =
+                sheetData.length;
+
+            const totalEmployees =
+                selectedEmployees.length;
+
+            // Split size
+            const chunkSize =
+                Math.ceil(totalRows / totalEmployees);
+
+            console.log({
+                totalRows,
+                totalEmployees,
+                chunkSize
             });
 
-            return res.status(201).json({ success: true, message: 'Document assigned successfully.' });
+            // Create split files
+            for (
+                let i = 0;
+                i < totalEmployees;
+                i++
+            ) {
+
+                const empId =
+                    selectedEmployees[i];
+
+                if (
+                    !mongoose.Types.ObjectId.isValid(empId)
+                ) {
+
+                    console.log("INVALID EMP ID:", empId);
+                    continue;
+                }
+
+                const startIndex =
+                    i * chunkSize;
+
+                const endIndex =
+                    Math.min(
+                        startIndex + chunkSize,
+                        totalRows
+                    );
+
+                const empChunkData =
+                    sheetData.slice(
+                        startIndex,
+                        endIndex
+                    );
+
+                console.log(
+                    `EMP ${i + 1}`,
+                    startIndex,
+                    endIndex,
+                    empChunkData.length
+                );
+
+                // Skip empty chunks
+                if (empChunkData.length === 0) {
+                    continue;
+                }
+
+                // Create new workbook
+                const newWorksheet =
+                    xlsx.utils.json_to_sheet(empChunkData);
+
+                const newWorkbook =
+                    xlsx.utils.book_new();
+
+                xlsx.utils.book_append_sheet(
+                    newWorkbook,
+                    newWorksheet,
+                    sheetName
+                );
+
+                // Unique split file name
+                const splitFileName =
+                    `split-${i}-${Date.now()}${ext}`;
+
+                const splitFilePath =
+                    path.join(
+                        './public/uploads/',
+                        splitFileName
+                    );
+
+                // Write split file
+                xlsx.writeFile(
+                    newWorkbook,
+                    splitFilePath
+                );
+
+                // Save DB entry
+                await Document.create({
+
+                    adminId: validAdminId,
+
+                    employeeId:
+                        new mongoose.Types.ObjectId(empId),
+
+                    fileName:
+                        `${i + 1}_Part_${req.file.originalname}`,
+
+                    filePath:
+                        `/uploads/${splitFileName}`
+                });
+            }
+
+            // Delete original uploaded master file
+            try {
+
+                fs.unlinkSync(originalFilePath);
+
+            } catch (err) {
+
+                console.log(
+                    "MASTER FILE DELETE ERROR:",
+                    err.message
+                );
+            }
+
+            return res.status(201).json({
+
+                success: true,
+
+                message:
+                    `Excel split successfully into ${selectedEmployees.length} parts`
+            });
+        }
+
+        // ===================================================
+        // SINGLE EMPLOYEE MODE
+        // ===================================================
+
+        else {
+
+            if (
+                !mongoose.Types.ObjectId.isValid(employeeId)
+            ) {
+
+                return res.status(400).json({
+                    success: false,
+                    message: 'Invalid Employee ID'
+                });
+            }
+
+            await Document.create({
+
+                adminId: validAdminId,
+
+                employeeId:
+                    new mongoose.Types.ObjectId(employeeId),
+
+                fileName:
+                    req.file.originalname,
+
+                filePath:
+                    `/uploads/${req.file.filename}`
+            });
+
+            return res.status(201).json({
+
+                success: true,
+
+                message:
+                    'Document assigned successfully'
+            });
         }
 
     } catch (error) {
-        console.error("UPLOAD ERROR:", error);
-        return res.status(500).json({ success: false, message: 'Server Error during upload.' });
+
+        console.error(
+            "UPLOAD ERROR:",
+            error
+        );
+
+        return res.status(500).json({
+
+            success: false,
+
+            message:
+                'Server Error during upload'
+        });
     }
 });
 
