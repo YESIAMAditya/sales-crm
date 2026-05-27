@@ -1,0 +1,1010 @@
+<!DOCTYPE html>
+
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Employee Mobile Dialer CRM</title>
+
+    <style>
+
+        /* --- CSS Variables for Light / Dark Theme --- */
+
+        :root {
+
+            --bg-color: #121214;
+
+            --card-bg: #1a1a24;
+
+            --text-color: #ffffff;
+
+            --border-color: #2d2d3f;
+
+            --input-bg: #22252e;
+
+            --table-header: #252538;
+
+            --search-bg: #1e293b;
+
+            --accent-color: #deff9a;
+
+            --accent-text: #000000;
+
+        }
+
+
+
+        [data-theme="light"] {
+
+            --bg-color: #f4f5f8;
+
+            --card-bg: #ffffff;
+
+            --text-color: #1e1e24;
+
+            --border-color: #e2e8f0;
+
+            --input-bg: #f8fafc;
+
+            --table-header: #f1f5f9;
+
+            --search-bg: #ffffff;
+
+            --accent-color: #4f46e5;
+
+            --accent-text: #ffffff;
+
+        }
+
+
+
+        body { font-family: 'Segoe UI', sans-serif; background-color: var(--bg-color); color: var(--text-color); margin: 0; padding-bottom: 40px; transition: background 0.3s, color 0.3s; }
+
+        .nav { background: var(--card-bg); padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--accent-color); transition: background 0.3s; }
+
+        .container { padding: 15px; max-width: 1400px; margin: 0 auto; }
+
+       
+
+        .card { background: var(--card-bg); padding: 20px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.15); margin-bottom: 20px; transition: background 0.3s; }
+
+        h2 { color: var(--text-color); margin: 0; }
+
+        h3 { color: var(--accent-color); margin-top: 0; }
+
+       
+
+        select, input, textarea { padding: 10px; border-radius: 5px; border: 1px solid var(--border-color); background-color: var(--input-bg); color: var(--text-color); box-sizing: border-box; }
+
+        .full-width { width: 100%; margin-bottom: 10px; }
+
+
+
+        .sheet-control-box { display: flex; gap: 8px; align-items: center; width: 100%; }
+
+
+
+        /* Advanced Filter Panel Styling */
+
+        .filter-toggle-container { margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+
+        .toggle-btn { background: var(--card-bg); color: var(--text-color); border: 1px solid var(--border-color); padding: 8px 15px; font-weight: bold; border-radius: 5px; cursor: pointer; font-size: 13px; transition: 0.2s; white-space: nowrap; }
+
+        .toggle-btn:hover { background: var(--accent-color); color: var(--accent-text); border-color: var(--accent-color); }
+
+       
+
+        /* Specific theme toggle button style */
+
+        .theme-btn { background: var(--accent-color); color: var(--accent-text); border: none; padding: 8px 14px; font-weight: bold; border-radius: 5px; cursor: pointer; font-size: 13px; display: inline-flex; align-items: center; gap: 5px; }
+
+        .theme-btn:hover { opacity: 0.9; }
+
+
+
+        .filter-panel { display: none; background: var(--card-bg); padding: 15px; border-radius: 8px; border: 1px solid var(--border-color); margin-bottom: 15px; }
+
+        .filter-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 15px; }
+
+        .filter-group { display: flex; flex-direction: column; gap: 5px; }
+
+        .filter-group label { font-size: 12px; color: var(--text-color); opacity: 0.8; font-weight: bold; }
+
+
+
+        .tabs-wrapper { display: flex; overflow-x: auto; margin-bottom: -1px; border-bottom: 1px solid var(--border-color); scrollbar-width: none; }
+
+        .tabs-wrapper::-webkit-scrollbar { display: none; }
+
+        .tab-btn { background: var(--table-header); color: var(--text-color); border: none; padding: 12px 18px; cursor: pointer; border-radius: 8px 8px 0 0; font-weight: bold; font-size: 13px; white-space: nowrap; flex-shrink: 0; margin-right: 4px; transition: 0.2s; opacity: 0.7; }
+
+        .tab-btn.active { background: var(--accent-color); color: var(--accent-text); opacity: 1; }
+
+       
+
+        .table-container { margin-top: 0px; max-width: 100%; overflow-x: auto; }
+
+        table { width: 100%; border-collapse: collapse; background: var(--card-bg); text-align: left; }
+
+        th, td { padding: 12px 15px; border-bottom: 1px solid var(--border-color); font-size: 14px; white-space: nowrap; color: var(--text-color); }
+
+        th { background-color: var(--table-header); color: var(--text-color); font-weight: bold; }
+
+        tr:hover { background-color: var(--table-header); }
+
+       
+
+        .action-btn { background: var(--accent-color); color: var(--accent-text); border: none; padding: 6px 12px; font-weight: bold; border-radius: 4px; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; font-size: 13px; }
+
+       
+
+        .danger-btn { background: #ff4a4a; color: white; border: none; padding: 10px 15px; font-weight: bold; border-radius: 4px; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; font-size: 13px; transition: 0.2s; }
+
+        .danger-btn:hover { background: #cc3b3b; }
+
+       
+
+        .compact-remove-btn { display: none; background: #ff4a4a; color: white; border: none; padding: 10px 14px; font-weight: bold; border-radius: 5px; cursor: pointer; font-size: 13px; white-space: nowrap; transition: 0.2s; }
+
+        .compact-remove-btn:hover { background: #cc3b3b; }
+
+       
+
+        .call-link { background: #22c55e; color: white; padding: 6px 12px; border-radius: 4px; text-decoration: none; font-weight: bold; font-size: 13px; display: inline-flex; align-items: center; gap: 5px; }
+
+        .call-link:hover { background: #16a34a; }
+
+        .logout { color: #ff4a4a; cursor: pointer; font-weight: bold; margin-left: 10px; }
+
+
+
+        .search-box { width: 100%; padding: 12px; margin-bottom: 0; border-radius: 6px; border: 1px solid var(--border-color); background: var(--search-bg); color: var(--text-color); }
+
+
+
+        @media (max-width: 768px) {
+
+            .nav { padding: 15px; font-size: 14px; flex-direction: column; gap: 10px; align-items: flex-start; }
+
+            .nav > div { width: 100%; display: flex; justify-content: space-between; align-items: center; }
+
+            table, thead, tbody, th, td, tr { display: block; width: 100%; }
+
+            thead { display: none; }
+
+           
+
+            tr { background: var(--card-bg); margin-bottom: 15px; border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; box-sizing: border-box; }
+
+            td { text-align: right; padding: 8px 0; border-bottom: 1px dashed var(--border-color); display: flex; justify-content: space-between; align-items: center; font-size: 13px; white-space: normal; }
+
+           
+
+            td::before { content: attr(data-label); font-weight: bold; color: var(--text-color); opacity: 0.7; text-align: left; margin-right: 15px; }
+
+            td:last-child { border-bottom: none; margin-top: 8px; justify-content: flex-end; align-items: flex-end; }
+
+           
+
+            select, input { width: 100%; text-align: left; }
+
+            .sheet-control-box { flex-direction: column; align-items: stretch; }
+
+            .compact-remove-btn { width: 100%; text-align: center; justify-content: center; }
+
+            .filter-toggle-container { flex-direction: column; align-items: stretch; }
+
+        }
+
+    </style>
+
+</head>
+
+<body>
+
+
+
+    <div class="nav">
+
+        <h2>CRM Mobile Dialer</h2>
+
+        <div>
+
+            <span id="empName" style="font-weight:bold;">...</span>
+
+            <div>
+
+                <button class="theme-btn" id="themeToggleBtn" onclick="toggleTheme()">☀️ Light Theme</button>
+
+                <span class="logout" onclick="logout()">Logout</span>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+
+    <div class="container">
+
+       
+
+        <div class="card">
+
+            <h3>📁 Assigned Sheets</h3>
+
+            <div class="sheet-control-box">
+
+                <select id="excelDocSelect" onchange="loadExcelToDashboard()" class="full-width" style="font-size:15px; margin-bottom:0;">
+
+                    <option value="">-- Choose Data Sheet --</option>
+
+                </select>
+
+                <button id="deleteSheetBtn" class="compact-remove-btn" onclick="deleteCurrentSheetAssociation()">❌ Remove File</button>
+
+            </div>
+
+        </div>
+
+
+
+        <div id="dataBoard" style="display: none;">
+
+           
+
+            <div class="filter-toggle-container">
+
+                <input type="text" id="leadSearchInput" class="search-box" placeholder="🔍 Search student by Name or Phone..." oninput="renderTable()">
+
+                <button class="toggle-btn" onclick="toggleFilterPanel()">⚙️ Filters & Delete</button>
+
+            </div>
+
+
+
+            <div id="filterPanel" class="filter-panel">
+
+                <div class="filter-grid">
+
+                    <div class="filter-group">
+
+                        <label>Start Date</label>
+
+                        <input type="date" id="filterStartDate" onchange="renderTable()">
+
+                    </div>
+
+                    <div class="filter-group">
+
+                        <label>End Date</label>
+
+                        <input type="date" id="filterEndDate" onchange="renderTable()">
+
+                    </div>
+
+                    <div class="filter-group">
+
+                        <label>History Status</label>
+
+                        <select id="filterStatus" onchange="renderTable()">
+
+                            <option value="ALL">-- All Statuses --</option>
+
+                            <option value="NO_HISTORY">No History / New</option>
+
+                            <option value="Ringing">Ringing</option>
+
+                            <option value="Interested">Interested</option>
+
+                            <option value="Follow-up">Follow-up</option>
+
+                            <option value="Rejected">Rejected</option>
+
+                        </select>
+
+                    </div>
+
+                </div>
+
+                <div style="display: flex; justify-content: flex-end; gap: 10px;">
+
+                    <button class="toggle-btn" style="border-color: #888; color: #aaa;" onclick="resetFilters()">Reset</button>
+
+                    <button class="danger-btn" style="margin-top:0;" onclick="deleteFilteredLeads()">🗑️ Delete Filtered Leads</button>
+
+                </div>
+
+            </div>
+
+
+
+            <div class="tabs-wrapper" style="margin-top: 15px;">
+
+                <button class="tab-btn active" id="tab-pending" onclick="switchTab('pending')">📞 Pending (<span id="count-pending">0</span>)</button>
+
+                <button class="tab-btn" id="tab-followup" onclick="switchTab('followup')">⏳ Follow-ups (<span id="count-followup">0</span>)</button>
+
+                <button class="tab-btn" id="tab-interested" onclick="switchTab('interested')">🔥 Interested (<span id="count-interested">0</span>)</button>
+
+                <button class="tab-btn" id="tab-archived" onclick="switchTab('archived')">✅ Archived (<span id="count-archived">0</span>)</button>
+
+            </div>
+
+
+
+            <div class="card" style="border-radius: 0 0 8px 8px; padding: 10px;">
+
+                <div class="table-container">
+
+                    <table id="excelTable">
+
+                        <thead id="tableHeader"></thead>
+
+                        <tbody id="tableBody"></tbody>
+
+                    </table>
+
+                </div>
+
+            </div>
+
+        </div>
+
+
+
+    </div>
+<script>
+    const rawEmpData = localStorage.getItem('empInfo') || localStorage.getItem('employeeInfo');
+    const empInfo = rawEmpData ? JSON.parse(rawEmpData) : null;
+
+    let currentDocId = '';
+    let currentTab = 'pending';
+    let fullExcelData = [];
+    let historyMap = {};
+    let currentFilesList = [];
+
+    // ✅ NEW FIX VARIABLES
+    let loadedDocumentCache = {};
+    let currentLoadedData = [];
+
+    // --- Theme Manager Logic ---
+    function toggleTheme() {
+        const currentTheme = document.documentElement.getAttribute('data-theme');
+        const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+
+        document.documentElement.setAttribute('data-theme', newTheme);
+        localStorage.setItem('theme', newTheme);
+
+        const btn = document.getElementById('themeToggleBtn');
+        btn.innerText = newTheme === 'light'
+            ? '🌙 Dark Theme'
+            : '☀️ Light Theme';
+    }
+
+    // Theme Init
+    const savedTheme = localStorage.getItem('theme') || 'dark';
+
+    document.documentElement.setAttribute('data-theme', savedTheme);
+
+    window.addEventListener('DOMContentLoaded', () => {
+        document.getElementById('themeToggleBtn').innerText =
+            savedTheme === 'light'
+                ? '🌙 Dark Theme'
+                : '☀️ Light Theme';
+
+        checkAndInit();
+    });
+
+    function checkAndInit() {
+        if (!empInfo) {
+            alert("Employee login data missing!");
+            window.location.href = '/emp-login.html';
+            return;
+        }
+
+        console.log("Employee:", empInfo);
+
+        document.getElementById('empName').innerText =
+            empInfo.name || "Agent";
+
+        fetchMySheets();
+    }
+
+    // ✅ FIXED
+    async function fetchMySheets() {
+        try {
+            const empId =
+                empInfo.id ||
+                empInfo._id ||
+                (empInfo.employee &&
+                    (empInfo.employee.id || empInfo.employee._id));
+
+            console.log("FETCHING FILES FOR:", empId);
+
+            const res = await fetch(`/api/documents/my-files/${empId}`);
+
+            const data = await res.json();
+
+            console.log("FILES RECEIVED:", data);
+
+            // ✅ REMOVE DUPLICATES
+            const uniqueFiles = [];
+            const usedIds = new Set();
+
+            data.forEach(file => {
+                if (!usedIds.has(file._id)) {
+                    usedIds.add(file._id);
+                    uniqueFiles.push(file);
+                }
+            });
+
+            currentFilesList = uniqueFiles;
+
+            renderDropdownOptions();
+
+        } catch (e) {
+            console.error("Error fetching sheets:", e);
+        }
+    }
+
+    function renderDropdownOptions() {
+
+        const dropdown = document.getElementById('excelDocSelect');
+
+        dropdown.innerHTML =
+            '<option value="">-- Choose Data Sheet --</option>';
+
+        if (!currentFilesList || currentFilesList.length === 0) {
+
+            dropdown.innerHTML +=
+                '<option disabled>No sheets assigned</option>';
+
+            document.getElementById('deleteSheetBtn').style.display = 'none';
+
+            return;
+        }
+
+        currentFilesList.forEach(file => {
+
+            dropdown.innerHTML += `
+                <option value="${file._id}">
+                    ${file.fileName}
+                </option>
+            `;
+        });
+
+        dropdown.value = currentDocId;
+    }
+
+    // ✅ MASSIVE FIX HERE
+    async function loadExcelToDashboard() {
+
+        currentDocId =
+            document.getElementById('excelDocSelect').value;
+
+        const deleteSheetBtn =
+            document.getElementById('deleteSheetBtn');
+
+        if (!currentDocId) {
+
+            document.getElementById('dataBoard').style.display = 'none';
+
+            deleteSheetBtn.style.display = 'none';
+
+            return;
+        }
+
+        deleteSheetBtn.style.display = 'inline-block';
+
+        try {
+
+            // ✅ CACHE PREVENTS MULTIPLE SAME REQUESTS
+            if (loadedDocumentCache[currentDocId]) {
+
+                console.log("Using cached data");
+
+                fullExcelData =
+                    loadedDocumentCache[currentDocId].fileData;
+
+                historyMap =
+                    loadedDocumentCache[currentDocId].historyMap;
+
+                document.getElementById('dataBoard').style.display = 'block';
+
+                renderTable();
+
+                return;
+            }
+
+            const res = await fetch(
+                `/api/documents/read-excel/${currentDocId}`
+            );
+
+            if (!res.ok) {
+
+                alert("Error loading excel");
+
+                return;
+            }
+
+            const data = await res.json();
+
+            console.log("EXCEL DATA:", data);
+
+            // ✅ IMPORTANT
+            fullExcelData = [...(data.fileData || [])];
+
+            historyMap = {};
+
+            if (data.savedStatuses) {
+
+                data.savedStatuses.forEach(s => {
+
+                    if (s.customerPhone) {
+
+                        historyMap[
+                            String(s.customerPhone).trim()
+                        ] = s;
+                    }
+                });
+            }
+
+            // ✅ SAVE CACHE
+            loadedDocumentCache[currentDocId] = {
+                fileData: fullExcelData,
+                historyMap: historyMap
+            };
+
+            document.getElementById('dataBoard').style.display = 'block';
+
+            renderTable();
+
+        } catch (err) {
+
+            console.error(err);
+
+            alert("Server crash while reading sheet");
+        }
+    }
+
+    function deleteCurrentSheetAssociation() {
+
+        if (!currentDocId) return;
+
+        const targetFile =
+            currentFilesList.find(f => f._id === currentDocId);
+
+        const fileName =
+            targetFile ? targetFile.fileName : "this sheet";
+
+        const confirmClear = confirm(
+            `Remove "${fileName}" from list?`
+        );
+
+        if (!confirmClear) return;
+
+        currentFilesList =
+            currentFilesList.filter(
+                file => file._id !== currentDocId
+            );
+
+        delete loadedDocumentCache[currentDocId];
+
+        currentDocId = "";
+
+        document.getElementById('deleteSheetBtn').style.display = 'none';
+
+        document.getElementById('dataBoard').style.display = 'none';
+
+        fullExcelData = [];
+
+        renderDropdownOptions();
+
+        alert("Removed successfully");
+    }
+
+    function toggleFilterPanel() {
+
+        const panel =
+            document.getElementById('filterPanel');
+
+        panel.style.display =
+            panel.style.display === 'block'
+                ? 'none'
+                : 'block';
+    }
+
+    function resetFilters() {
+
+        document.getElementById('filterStartDate').value = '';
+
+        document.getElementById('filterEndDate').value = '';
+
+        document.getElementById('filterStatus').value = 'ALL';
+
+        renderTable();
+    }
+
+    // ✅ IMPORTANT FIXED TABLE RENDER
+    function renderTable() {
+
+        if (!fullExcelData || fullExcelData.length === 0) {
+
+            document.getElementById('tableBody').innerHTML =
+                '<tr><td>No Data Found</td></tr>';
+
+            return;
+        }
+
+        const headers =
+            Object.keys(fullExcelData[0]);
+
+        const thead =
+            document.getElementById('tableHeader');
+
+        const tbody =
+            document.getElementById('tableBody');
+
+        tbody.innerHTML = '';
+
+        let headerHtml = '<tr>';
+
+        headers.forEach(h => {
+            headerHtml += `<th>${h}</th>`;
+        });
+
+        headerHtml += `
+            <th>Call</th>
+            <th>Status</th>
+            <th>Remarks</th>
+            <th>Action</th>
+        </tr>
+        `;
+
+        thead.innerHTML = headerHtml;
+
+        let counts = {
+            pending: 0,
+            followup: 0,
+            interested: 0,
+            archived: 0
+        };
+
+        const searchKeyword =
+            document.getElementById('leadSearchInput')
+                .value
+                .toLowerCase()
+                .trim();
+
+        fullExcelData.forEach((row, index) => {
+
+            let phoneKey = '';
+
+            for (let key of [
+                'Phone',
+                'phone',
+                'Mobile',
+                'mobile',
+                'NUMBER',
+                'Number',
+                'Contact',
+                'contact'
+            ]) {
+
+                if (row[key] !== undefined) {
+
+                    phoneKey =
+                        String(row[key]).trim();
+
+                    break;
+                }
+            }
+
+            if (!phoneKey) {
+                phoneKey =
+                    String(
+                        Object.values(row)[1] ||
+                        `phone-${index}`
+                    ).trim();
+            }
+
+            let nameKey = '';
+
+            for (let key of [
+                'Name',
+                'name',
+                'Student Name'
+            ]) {
+
+                if (row[key] !== undefined) {
+
+                    nameKey =
+                        String(row[key]).trim();
+
+                    break;
+                }
+            }
+
+            if (!nameKey) {
+
+                nameKey =
+                    String(
+                        Object.values(row)[0] ||
+                        `Customer-${index}`
+                    ).trim();
+            }
+
+            // SEARCH
+            if (
+                searchKeyword &&
+                !nameKey.toLowerCase().includes(searchKeyword) &&
+                !phoneKey.includes(searchKeyword)
+            ) {
+                return;
+            }
+
+            const hasHistory =
+                historyMap[phoneKey];
+
+            let itemTabSegment = 'pending';
+
+            if (hasHistory) {
+
+                if (hasHistory.status === 'Follow-up')
+                    itemTabSegment = 'followup';
+
+                else if (hasHistory.status === 'Interested')
+                    itemTabSegment = 'interested';
+
+                else if (
+                    hasHistory.status === 'Ringing' ||
+                    hasHistory.status === 'Rejected'
+                )
+                    itemTabSegment = 'archived';
+            }
+
+            counts[itemTabSegment]++;
+
+            if (currentTab !== itemTabSegment)
+                return;
+
+            let rowHtml = `
+                <tr>
+            `;
+
+            headers.forEach(h => {
+
+                rowHtml += `
+                    <td data-label="${h}">
+                        ${row[h] ?? '-'}
+                    </td>
+                `;
+            });
+
+            const savedStatus =
+                hasHistory
+                    ? hasHistory.status
+                    : 'Ringing';
+
+            const savedRemark =
+                hasHistory
+                    ? hasHistory.remarks || ''
+                    : '';
+
+            rowHtml += `
+                <td data-label="Call">
+                    <a href="tel:${phoneKey}" class="call-link">
+                        📞 Call
+                    </a>
+                </td>
+
+                <td data-label="Status">
+                    <select id="status-${index}">
+                        <option value="Ringing"
+                            ${savedStatus === 'Ringing' ? 'selected' : ''}>
+                            Ringing
+                        </option>
+
+                        <option value="Interested"
+                            ${savedStatus === 'Interested' ? 'selected' : ''}>
+                            Interested
+                        </option>
+
+                        <option value="Follow-up"
+                            ${savedStatus === 'Follow-up' ? 'selected' : ''}>
+                            Follow-up
+                        </option>
+
+                        <option value="Rejected"
+                            ${savedStatus === 'Rejected' ? 'selected' : ''}>
+                            Rejected
+                        </option>
+                    </select>
+                </td>
+
+                <td data-label="Remarks">
+                    <input
+                        type="text"
+                        id="remarks-${index}"
+                        value="${savedRemark}"
+                        placeholder="Remarks"
+                    >
+                </td>
+
+                <td data-label="Action">
+                    <button
+                        class="action-btn"
+                        onclick="submitRowAction(
+                            ${index},
+                            '${nameKey.replace(/'/g, "\\'")}',
+                            '${phoneKey}'
+                        )"
+                    >
+                        ${hasHistory ? '📝 Update' : '🚀 Submit'}
+                    </button>
+                </td>
+            </tr>
+            `;
+
+            tbody.innerHTML += rowHtml;
+        });
+
+        document.getElementById('count-pending').innerText =
+            counts.pending;
+
+        document.getElementById('count-followup').innerText =
+            counts.followup;
+
+        document.getElementById('count-interested').innerText =
+            counts.interested;
+
+        document.getElementById('count-archived').innerText =
+            counts.archived;
+    }
+
+    async function submitRowAction(index, name, phone) {
+
+        const status =
+            document.getElementById(`status-${index}`).value;
+
+        const remarks =
+            document.getElementById(`remarks-${index}`).value;
+
+        const empId =
+            empInfo.id ||
+            empInfo._id ||
+            (empInfo.employee &&
+                (empInfo.employee.id || empInfo.employee._id));
+
+        const res = await fetch(
+            '/api/documents/update-status',
+            {
+                method: 'POST',
+
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+
+                body: JSON.stringify({
+                    employeeId: empId,
+                    documentId: currentDocId,
+                    customerName: name,
+                    customerPhone: phone,
+                    status,
+                    remarks
+                })
+            }
+        );
+
+        if (res.ok) {
+
+            historyMap[phone] = {
+                status,
+                remarks,
+                updatedAt: new Date()
+            };
+
+            // ✅ CACHE UPDATE
+            if (loadedDocumentCache[currentDocId]) {
+
+                loadedDocumentCache[currentDocId]
+                    .historyMap = historyMap;
+            }
+
+            alert(`Updated: ${status}`);
+
+            renderTable();
+
+        } else {
+
+            alert("Status update failed");
+        }
+    }
+
+    function switchTab(tab) {
+
+        currentTab = tab;
+
+        ['pending', 'followup', 'interested', 'archived']
+            .forEach(t => {
+
+                document
+                    .getElementById(`tab-${t}`)
+                    .classList.toggle(
+                        'active',
+                        t === tab
+                    );
+            });
+
+        renderTable();
+    }
+
+    async function logout() {
+
+        try {
+
+            const empId =
+                empInfo?.id ||
+                empInfo?._id ||
+                (empInfo?.employee &&
+                    (
+                        empInfo.employee.id ||
+                        empInfo.employee._id
+                    ));
+
+            if (empId) {
+
+                await fetch('/api/employees/logout', {
+
+                    method: 'POST',
+
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+
+                    body: JSON.stringify({
+                        employeeId: empId
+                    })
+                });
+            }
+
+        } catch (err) {
+
+            console.error(err);
+        }
+
+        localStorage.clear();
+
+        window.location.href = '/emp-login.html';
+    }
+
+    window.addEventListener('pageshow', function (event) {
+
+        if (
+            event.persisted ||
+            (
+                typeof window.performance != "undefined" &&
+                window.performance.navigation.type === 2
+            )
+        ) {
+
+            const checkToken =
+                localStorage.getItem('empInfo') ||
+                localStorage.getItem('employeeInfo');
+
+            if (!checkToken) {
+
+                window.location.reload();
+            }
+        }
+    });
+</script>
+</body>
+</html> 
+

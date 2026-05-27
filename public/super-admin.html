@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>⚡ Super Admin Master Panel</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+</head>
+<body class="bg-gray-100 font-sans">
+
+    <nav class="bg-indigo-700 text-white p-4 shadow-md">
+        <div class="max-w-7xl mx-auto flex justify-between items-center">
+            <h1 class="text-2xl font-bold tracking-wide">👑 CRM Super Admin Dashboard</h1>
+            <span class="bg-indigo-900 px-4 py-2 rounded text-sm font-semibold">Master Control ON</span>
+        </div>
+    </nav>
+
+    <div class="max-w-7xl mx-auto p-6">
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            <div class="bg-white p-6 rounded-lg shadow-sm border-l-4 border-blue-500">
+                <p class="text-gray-500 text-sm font-medium uppercase">Total Registered Admins</p>
+                <p id="stat-total-admins" class="text-3xl font-bold text-gray-800">0</p>
+            </div>
+            <div class="bg-white p-6 rounded-lg shadow-sm border-l-4 border-green-500">
+                <p class="text-gray-500 text-sm font-medium uppercase">System Status</p>
+                <p class="text-2xl font-bold text-green-600">Connected & Live ✅</p>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+            <h3 class="text-lg font-bold text-gray-700 mb-4">➕ Generate New Admin Account</h3>
+            <form id="create-admin-form" class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Company / Gym Name</label>
+                    <input type="text" id="new-company" placeholder="e.g., Gold Gym" class="w-full p-2 border border-gray-300 rounded bg-white text-gray-800 outline-none focus:border-indigo-500" required>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Admin Email ID</label>
+                    <input type="email" id="new-email" placeholder="admin@gym.com" class="w-full p-2 border border-gray-300 rounded bg-white text-gray-800 outline-none focus:border-indigo-500" required>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Temporary Password</label>
+                    <input type="text" id="new-password" placeholder="Min 6 chars" class="w-full p-2 border border-gray-300 rounded bg-white text-gray-800 outline-none focus:border-indigo-500" required>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Employee Limit</label>
+                    <div class="flex gap-2">
+                        <input type="number" id="new-limit" value="5" class="w-20 p-2 border border-gray-300 rounded bg-white text-gray-800 outline-none focus:border-indigo-500" min="1">
+                        <button type="submit" class="w-full bg-green-600 text-white font-bold py-2 px-4 rounded hover:bg-green-700 transition shadow">
+                            Generate ID
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <div class="bg-white rounded-lg shadow-md overflow-hidden">
+            <div class="p-5 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
+                <h3 class="text-lg font-bold text-gray-700">All Registered Companies / Admins</h3>
+                <button onclick="fetchAdminList()" class="bg-indigo-600 text-white text-sm px-4 py-2 rounded hover:bg-indigo-700 transition">
+                    🔄 Refresh Data
+                </button>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-gray-100 text-gray-600 text-sm uppercase font-semibold border-b border-gray-200">
+                            <th class="p-4">Admin / Company Details</th>
+                            <th class="p-4">Current Limit</th>
+                            <th class="p-4">Status</th>
+                            <th class="p-4 text-center">Actions Control Panel</th>
+                        </tr>
+                    </thead>
+                    <tbody id="admins-table-body" class="text-gray-700 text-sm divide-y divide-gray-200">
+                        <tr>
+                            <td colspan="4" class="p-8 text-center text-gray-500">Loading data from database... Please wait.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        const API_BASE_URL = '/api/super-admin';
+
+        // Page load hote hi data fetch karo
+        document.addEventListener('DOMContentLoaded', fetchAdminList);
+
+        // 1. BACKEND SE SARE ADMINS LEKAR AANA
+        async function fetchAdminList() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/all-admins`);
+                const data = await response.json();
+
+                if (!response.ok) throw new Error(data.message);
+
+                document.getElementById('stat-total-admins').innerText = data.totalAdmins || 0;
+
+                const tableBody = document.getElementById('admins-table-body');
+                tableBody.innerHTML = '';
+
+                if(!data.admins || data.admins.length === 0) {
+                    tableBody.innerHTML = `<tr><td colspan="4" class="p-8 text-center text-gray-500">No Admins found in the database.</td></tr>`;
+                    return;
+                }
+
+                data.admins.forEach(admin => {
+                    const isBlocked = admin.isBlocked === true;
+                    const blockBtnText = isBlocked ? '✅ Unblock Account' : '🛑 Block Admin';
+                    const blockBtnClass = isBlocked ? 'bg-green-500 hover:bg-green-600' : 'bg-red-500 hover:bg-red-600';
+                    
+                    const statusBadge = isBlocked 
+                        ? '<span class="bg-red-100 text-red-800 px-2.5 py-0.5 rounded-full text-xs font-bold">Blocked</span>' 
+                        : '<span class="bg-green-100 text-green-800 px-2.5 py-0.5 rounded-full text-xs font-bold">Active</span>';
+
+                    tableBody.innerHTML += `
+                        <tr class="hover:bg-gray-50 transition">
+                            <td class="p-4">
+                                <div class="font-bold text-gray-800 text-base">${admin.companyName || 'N/A'}</div>
+                                <div class="text-xs text-gray-500">Email: ${admin.email}</div>
+                                <div class="text-xs text-indigo-600 font-medium">Secret Key: ${admin.secretKey || 'None'}</div>
+                            </td>
+                            <td class="p-4 font-bold text-gray-700 text-base">
+                                <span class="bg-blue-50 text-blue-700 px-3 py-1 rounded border border-blue-200">
+                                    ${admin.employeeLimit || 5} Emps
+                                </span>
+                            </td>
+                            <td class="p-4">${statusBadge}</td>
+                            <td class="p-4">
+                                <div class="flex flex-wrap gap-2 justify-center">
+                                    <div class="flex items-center border border-gray-300 rounded overflow-hidden">
+                                        <input type="number" id="limit-input-${admin._id}" value="${admin.employeeLimit || 5}" class="w-16 p-1 text-center outline-none bg-white text-gray-800 font-semibold" min="0">
+                                        <button onclick="updateLimit('${admin._id}')" class="bg-indigo-600 text-white px-3 py-1.5 text-xs font-bold hover:bg-indigo-700 transition">Update</button>
+                                    </div>
+
+                                    <button onclick="toggleBlock('${admin._id}', ${!isBlocked})" class="${blockBtnClass} text-white px-3 py-1.5 text-xs rounded font-bold shadow-sm transition">
+                                        ${blockBtnText}
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    `;
+                });
+
+            } catch (error) {
+                console.error("Fetch Error:", error);
+                document.getElementById('admins-table-body').innerHTML = `
+                    <tr><td colspan="4" class="p-8 text-center text-red-500 font-semibold">❌ Network Error parsing dashboard data. Check backend connection!</td></tr>
+                `;
+            }
+        }
+
+        // 2. LIVE LIMIT CHANGE ACTION
+        async function updateLimit(adminId) {
+            const newLimit = document.getElementById(`limit-input-${adminId}`).value;
+            try {
+                const response = await fetch(`${API_BASE_URL}/update-limit`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ adminId, newLimit })
+                });
+                const data = await response.json();
+                alert(data.message);
+                fetchAdminList(); 
+            } catch (err) {
+                alert('Failed to update limit');
+            }
+        }
+
+        // 3. LIVE BLOCK / UNBLOCK ACTION
+        async function toggleBlock(adminId, statusToSet) {
+            try {
+                const response = await fetch(`${API_BASE_URL}/toggle-block`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ adminId, isBlocked: statusToSet })
+                });
+                const data = await response.json();
+                alert(data.message);
+                fetchAdminList(); 
+            } catch (err) {
+                alert('Failed to change block status');
+            }
+        }
+
+        // 4. GENERATE NEW ADMIN ACCOUNT JAVASCRIPT (Added by Aditya's Request)
+        document.getElementById('create-admin-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const companyName = document.getElementById('new-company').value;
+            const email = document.getElementById('new-email').value;
+            const password = document.getElementById('new-password').value;
+            const employeeLimit = document.getElementById('new-limit').value;
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/create-admin`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ companyName, email, password, employeeLimit })
+                });
+
+                const data = await response.json();
+                alert(data.message);
+
+                if (response.ok) {
+                    document.getElementById('create-admin-form').reset();
+                    document.getElementById('new-limit').value = "5"; 
+                    fetchAdminList(); 
+                }
+            } catch (err) {
+                alert('❌ Error generating admin account!');
+            }
+        });
+    </script>
+</body>
+</html>

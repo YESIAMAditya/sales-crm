@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel - Control Center</title>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <style>
+        /* 🎨 BASE ROOT FOR THEME TOGGLE */
+        :root {
+            --bg-body: #0f172a;
+            --bg-card: #1e293b;
+            --text-main: #ffffff;
+            --text-muted: #94a3b8;
+            --border-color: #334155;
+            --input-bg: #334155;
+            --accent-green: #deff9a;
+            --accent-hover: #bada78;
+        }
+
+        /* 📑 LIGHT THEME DECLARATION OVERRIDES */
+        body.light-theme {
+            --bg-body: #f8fafc;
+            --bg-card: #ffffff;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --border-color: #cbd5e1;
+            --input-bg: #f1f5f9;
+            --accent-green: #1e293b;
+            --accent-hover: #475569;
+        }
+
+        body { font-family: 'Segoe UI', sans-serif; background-color: var(--bg-body); color: var(--text-main); margin: 0; transition: background 0.3s, color 0.3s; }
+        .nav { background: var(--bg-card); padding: 20px 40px; display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #deff9a; transition: background 0.3s; }
+        .nav-actions { display: flex; align-items: center; gap: 15px; }
+        .container { padding: 30px; max-width: 1400px; margin: 0 auto; }
+        .grid { display: grid; grid-template-columns: 1fr 2fr; gap: 30px; }
+        .card { background: var(--bg-card); padding: 25px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.15); height: fit-content; margin-bottom: 25px; transition: background 0.3s; }
+        
+        /* 📊 COUNTERS BOX LAYOUT STYLE */
+        .analytics-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin-bottom: 25px; }
+        .counter-card { background: var(--bg-card); border-left: 5px solid #475569; padding: 15px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); text-align: center; }
+        .counter-card h4 { margin: 0 0 5px 0; font-size: 14px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+        .counter-card .num { font-size: 28px; font-weight: bold; color: var(--text-main); }
+        .counter-card.c-new { border-left-color: #94a3b8; }
+        .counter-card.c-ringing { border-left-color: #f39c12; }
+        .counter-card.c-interested { border-left-color: #2ecc71; }
+        .counter-card.c-follow { border-left-color: #3498db; }
+        .counter-card.c-rejected { border-left-color: #e74c3c; }
+
+        h2, h3 { color: #deff9a; margin-top: 0; }
+        body.light-theme h2, body.light-theme h3 { color: #2563eb; }
+        
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-size: 14px; color: var(--text-main); }
+        input, select { width: 100%; padding: 10px; border-radius: 5px; border: 1px solid var(--border-color); background-color: var(--input-bg); color: var(--text-main); box-sizing: border-box; }
+        
+        /* 🕹️ LIGHT THEME INPUT COLOR BALANCING */
+        body.light-theme input, body.light-theme select { color: #000000; }
+
+        .btn { padding: 10px 20px; background: #deff9a; color: black; border: none; font-weight: bold; border-radius: 5px; cursor: pointer; transition: 0.3s; }
+        .btn:hover { background: #bada78; }
+        body.light-theme .btn { background: #2563eb; color: white; }
+        body.light-theme .btn:hover { background: #1d4ed8; }
+
+        .btn-theme { background: #475569; color: white; border: none; padding: 10px 15px; border-radius: 5px; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 5px; }
+        body.light-theme .btn-theme { background: #cbd5e1; color: #0f172a; }
+
+        .btn-danger { background: #ef4444; color: white; }
+        .btn-danger:hover { background: #dc2626; }
+        .btn-success { background: #22c55e; color: white; }
+        .btn-success:hover { background: #16a34a; }
+        .btn-sm { padding: 5px 10px; font-size: 12px; margin-left: 5px; }
+        
+        .table-container { overflow-x: auto; width: 100%; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; background: var(--bg-card); transition: background 0.3s; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid var(--border-color); font-size: 14px; color: var(--text-main); }
+        th { background-color: var(--border-color); color: #deff9a; }
+        body.light-theme th { color: #2563eb; }
+        tr:hover { background-color: var(--border-color); }
+        
+        .status-badge { padding: 5px 10px; border-radius: 4px; font-weight: bold; font-size: 12px; display: inline-block; text-transform: uppercase; }
+        .status-badge.status-new { background: #94a3b8; color: #fff; }
+        .status-ringing { background: #f39c12; color: #fff; }
+        .status-interested { background: #2ecc71; color: #fff; }
+        .status-follow-up { background: #3498db; color: #fff; }
+        .status-rejected { background: #e74c3c; color: #fff; }
+        
+        .status-active { color: #22c55e; font-weight: bold; }
+        .status-suspended { color: #ef4444; font-weight: bold; }
+
+        .splitter-box { background: var(--bg-card); border: 1px solid #deff9a; border-radius: 6px; padding: 12px; margin-top: 10px; display: none; }
+        .splitter-item { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; font-size: 14px; cursor: pointer;}
+        .splitter-item input { width: auto; cursor: pointer;}
+
+        .date-input-group { display: flex; align-items: center; gap: 5px; background: var(--input-bg); padding: 5px 10px; border-radius: 5px; border: 1px solid var(--border-color); }
+        .date-input-group input[type="date"] { width: 130px; padding: 5px; border: none; background: transparent; font-size: 13px; font-weight: bold; color: #deff9a; cursor: pointer; }
+        body.light-theme .date-input-group input[type="date"] { color: #2563eb; }
+
+        /* 🧹 ARCHIVE SYSTEM MODAL POPUP CLEAN STYLES */
+        .modal-overlay { position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.7); display:none; justify-content:center; align-items:center; z-index:9999; }
+        .modal-content { background: var(--bg-card); border: 2px solid var(--accent-green); padding:30px; border-radius:12px; width:450px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); position:relative; }
+        .modal-content h3 { margin-bottom:15px; font-size:20px; }
+        .archive-option-item { display:flex; align-items:center; gap:12px; padding:10px; background: rgba(255,255,255,0.03); margin-bottom:10px; border-radius:6px; border:1px solid var(--border-color); cursor:pointer; }
+        .archive-option-item input { width:auto; cursor:pointer; }
+
+        @media (max-width: 1024px) {
+            .grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="modal-overlay" id="archiveModal">
+        <div class="modal-content">
+            <h3>🧹 Workspace Workspace Cleaner</h3>
+            <p style="color:var(--text-muted); font-size:13px; margin-top:-5px; margin-bottom:20px;">Select which processed lead configurations to move out of your active workspace counters:</p>
+            
+            <div class="archive-option-item">
+                <input type="checkbox" id="archRej" value="Rejected">
+                <label for="archRej" style="cursor:pointer;">Hide all <strong>Rejected ❌</strong> Leads</label>
+            </div>
+            <div class="archive-option-item">
+                <input type="checkbox" id="archInt" value="Interested">
+                <label for="archInt" style="cursor:pointer;">Hide all <strong>Interested 👍</strong> Leads</label>
+            </div>
+            <div class="archive-option-item">
+                <input type="checkbox" id="archRing" value="Ringing">
+                <label for="archRing" style="cursor:pointer;">Hide all <strong>Ringing 🔔</strong> Logs</label>
+            </div>
+            <div class="archive-option-item">
+                <input type="checkbox" id="archFollow" value="Follow-up">
+                <label for="archFollow" style="cursor:pointer;">Hide all <strong>Follow-up 📞</strong> Leads</label>
+            </div>
+            
+            <hr style="border:0; border-top:1px solid var(--border-color); margin:15px 0;">
+            
+            <div class="form-group">
+                <label style="font-weight:bold; font-size:12px; color:var(--text-muted);">🗓️ TIME PERIOD FILTER ARCHIVE</label>
+                <select id="archiveTimeframe" style="padding:6px; margin-top:5px; font-size:13px;">
+                    <option value="0">All Timelines (No Date Cutoff)</option>
+                    <option value="7">Older than 7 Days</option>
+                    <option value="15">Older than 15 Days</option>
+                    <option value="30">Older than 30 Days</option>
+                </select>
+            </div>
+
+            <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+                <button class="btn" style="background:#475569; color:#fff;" onclick="closeArchiveModal()">Cancel</button>
+                <button class="btn btn-danger" onclick="processWorkspaceArchive()">Move to Archive</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="nav">
+        <h2>Admin Master Control Center</h2>
+        <div class="nav-actions">
+            <button class="btn-theme" onclick="toggleTheme()" id="themeBtn">☀️ Light Mode</button>
+            <button class="btn btn-danger" onclick="logout()">Logout</button>
+        </div>
+    </div>
+
+    <div class="container">
+        
+        <div class="analytics-container">
+            <div class="counter-card c-new"><h4>New Leads</h4><div class="num" id="counterNew">0</div></div>
+            <div class="counter-card c-ringing"><h4>Ringing</h4><div class="num" id="counterRinging">0</div></div>
+            <div class="counter-card c-interested"><h4>Interested 👍</h4><div class="num" id="counterInterested">0</div></div>
+            <div class="counter-card c-follow"><h4>Follow-Up 📞</h4><div class="num" id="counterFollowUp">0</div></div>
+            <div class="counter-card c-rejected"><h4>Rejected ❌</h4><div class="num" id="counterRejected">0</div></div>
+        </div>
+
+        <div class="grid">
+            <div>
+                <div class="card">
+                    <h3>👤 Create Employee ID</h3>
+                    <form id="addEmpForm">
+                        <div class="form-group">
+                            <label>Full Name</label>
+                            <input type="text" id="empName" required placeholder="Ex: Amit Sharma">
+                        </div>
+                        <div class="form-group">
+                            <label>Email ID (Login Username)</label>
+                            <input type="email" id="empEmail" required placeholder="Ex: amit@company.com">
+                        </div>
+                        <div class="form-group">
+                            <label>Password</label>
+                            <input type="password" id="empPass" required placeholder="Set Password">
+                        </div>
+                        <button type="submit" class="btn">Generate Account</button>
+                    </form>
+                </div>
+
+                <div class="card">
+                    <h3>📤 Bulk Assign Data Sheet (Excel/PDF)</h3>
+                    <form id="uploadForm" enctype="multipart/form-data">
+                        <div class="form-group">
+                            <label>Select File</label>
+                            <input type="file" id="myFile" accept=".pdf,.doc,.docx,.txt,.xlsx,.xls,.csv" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Assign to Employee</label>
+                            <select id="empSelect" required onchange="handleAssignDropdown(this.value)">
+                                <option value="">-- Select Employee --</option>
+                            </select>
+                        </div>
+
+                        <div class="splitter-box" id="splitterSection">
+                            <label style="font-weight: bold; margin-bottom: 8px;">Select Team Members to Split Data:</label>
+                            <div id="splitterCheckboxesList"></div>
+                        </div>
+
+                        <button type="submit" class="btn" style="margin-top: 15px;">Upload & Assign Sheet</button>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>🛠️ Team Management & Access Control</h3>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Employee Details</th>
+                                <th>Status</th>
+                                <th>Session Key lock</th>
+                                <th>Actions Control</th>
+                            </tr>
+                        </thead>
+                        <tbody id="adminEmpTableBody">
+                            <tr><td colspan="4" style="text-align:center; color:#888;">Loading employee roster...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="card" style="margin-top: 20px;">
+            <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 15px; margin-bottom: 15px;">
+                <h3>📊 Live Team Performance & Calling Logs</h3>
+                
+                <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center;">
+                    <button class="btn" onclick="openArchiveModal()" style="background:#f59e0b; color:#000; padding: 8px 15px;">Clean Workspace 🧹</button>
+                    
+                    <div class="date-input-group">
+                        <span style="font-size: 12px; color: var(--text-muted);">From:</span>
+                        <input type="date" id="reportStartDate" onchange="filterReports()">
+                        <span style="font-size: 12px; color: var(--text-muted);">To:</span>
+                        <input type="date" id="reportEndDate" onchange="filterReports()">
+                    </div>
+
+                    <div>
+                        <select id="reportEmpFilter" onchange="filterReports()" style="width: 150px; margin: 0; padding: 7px;">
+                            <option value="All">All Employees</option>
+                        </select>
+                    </div>
+                    <div>
+                        <select id="reportStatusFilter" onchange="filterReports()" style="width: 140px; margin: 0; padding: 7px;">
+                            <option value="All">All Statuses</option>
+                            <option value="New">New</option>
+                            <option value="Ringing">Ringing</option>
+                            <option value="Interested">Interested</option>
+                            <option value="Follow-up">Follow-up</option>
+                            <option value="Rejected">Rejected</option>
+                        </select>
+                    </div>
+                    
+                    <button class="btn btn-sm" onclick="clearDateFilters()" style="background: #475569; color: white; padding: 8px 12px;">Reset Date</button>
+                    <button class="btn btn-success" onclick="downloadReportExcel()" style="padding: 8px 15px;">Excel Download 💾</button>
+                </div>
+            </div>
+
+            <div class="table-container">
+                <table id="reportTable">
+                    <thead>
+                        <tr>
+                            <th>Employee Name</th>
+                            <th>Assigned Sheet Name</th>
+                            <th>Customer / Contact</th>
+                            <th>Current Status</th>
+                            <th>Remarks / History Logs</th>
+                            <th>Date & Time</th>
+                        </tr>
+                    </thead>
+                    <tbody id="adminReportTableBody">
+                        <tr><td colspan="6" style="text-align:center; color:#888;">No calling data logged yet.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+<script>
+    // 🔒 [ROUTE PROTECTION]
+    const rawAdminData = localStorage.getItem('adminInfo');
+    if (!rawAdminData) {
+        alert("🚨 Unauthorized Access! Pehle Admin Login karna zaroori hai.");
+        window.location.href = '/admin-login.html';
+    }
+
+    const adminInfo = JSON.parse(rawAdminData); 
+    let allReports = []; 
+    let filteredReportsGlobal = []; 
+    let currentActiveEmployeesBackup = []; 
+    let clientSideArchiveList = JSON.parse(localStorage.getItem('adminWorkspaceArchive')) || [];
+
+    // 🌗 [THEME CONTROLLER LOGIC]
+    if (localStorage.getItem('theme') === 'light') {
+        document.body.classList.add('light-theme');
+        const themeBtn = document.getElementById('themeBtn');
+        if (themeBtn) themeBtn.innerText = "🌙 Dark Mode";
+    }
+
+    function toggleTheme() {
+        const body = document.body;
+        const btn = document.getElementById('themeBtn');
+        if (!btn) return;
+        body.classList.toggle('light-theme');
+        
+        if (body.classList.contains('light-theme')) {
+            localStorage.setItem('theme', 'light');
+            btn.innerText = "🌙 Dark Mode";
+        } else {
+            localStorage.setItem('theme', 'dark');
+            btn.innerText = "☀️ Light Mode";
+        }
+    }
+
+    async function initAdminDashboard() {
+        await loadAdminData();
+        await fetchLiveReports();
+    }
+
+    function handleAssignDropdown(value) {
+        const splitterBox = document.getElementById('splitterSection');
+        if (splitterBox) {
+            splitterBox.style.display = value === "SPLIT_EQUALLY" ? "block" : "none";
+        }
+    }
+
+    // Load active/inactive employees list
+    async function loadAdminData() {
+        try {
+            const res = await fetch(`/api/employees/all/${adminInfo.id}`);
+            if (!res.ok) throw new Error('Failed to fetch employees list');
+            const employees = await res.json();
+            
+            const dropdown = document.getElementById('empSelect');
+            const empFilterDropdown = document.getElementById('reportEmpFilter');
+            const tbody = document.getElementById('adminEmpTableBody');
+            const splitterList = document.getElementById('splitterCheckboxesList');
+            
+            if (!dropdown || !empFilterDropdown || !tbody || !splitterList) return;
+
+            const savedDropdownVal = dropdown.value;
+            const savedFilterVal = empFilterDropdown.value;
+
+            dropdown.innerHTML = '<option value="">-- Select Employee --</option>';
+            dropdown.innerHTML += '<option value="SPLIT_EQUALLY" style="font-weight:bold;">🔄 -- Split Equally Among Team --</option>';
+            
+            empFilterDropdown.innerHTML = '<option value="All">All Employees</option>';
+            tbody.innerHTML = '';
+            splitterList.innerHTML = '';
+
+            currentActiveEmployeesBackup = employees.filter(e => e.status === 'Active');
+
+            employees.forEach(emp => {
+                empFilterDropdown.innerHTML += `<option value="${emp._id}">${emp.name}</option>`;
+
+                if(emp.status === 'Active') {
+                    dropdown.innerHTML += `<option value="${emp._id}">${emp.name}</option>`;
+                    splitterList.innerHTML += `
+                        <div class="splitter-item">
+                            <input type="checkbox" id="split-checkbox-${emp._id}" value="${emp._id}" checked>
+                            <label for="split-checkbox-${emp._id}">${emp.name} (${emp.email})</label>
+                        </div>
+                    `;
+                }
+
+                const isSuspended = emp.status === 'Suspended';
+                tbody.innerHTML += `
+                    <tr>
+                        <td><strong>${emp.name}</strong><br><small style="color:var(--text-muted)">${emp.email}</small></td>
+                        <td><span class="${isSuspended ? 'status-suspended' : 'status-active'}">${emp.status || 'Active'}</span></td>
+                        <td>
+                            <button class="btn btn-sm" onclick="forceKillSession('${emp._id}')" style="background:#64748b; color:white; font-size:11px;">
+                                🔓 Kill Device Lock
+                            </button>
+                        </td>
+                        <td>
+                            <div style="display: flex; gap: 4px; align-items: center;">
+                                <input type="password" id="pass-${emp._id}" placeholder="New Pass" style="width:70px; font-size:11px; padding:2px;">
+                                <button class="btn btn-sm" onclick="changePassword('${emp._id}')" style="background:#3b82f6; color:white; font-size:11px;">🔑</button>
+                                <button class="btn btn-sm ${isSuspended ? '' : 'btn-danger'}" onclick="toggleAccess('${emp._id}', '${emp.status || 'Active'}')">
+                                    ${isSuspended ? '🔓 Activate' : '🚫 Block'}
+                                </button>
+                                <button class="btn btn-sm btn-danger" onclick="deleteEmployee('${emp._id}')" style="background:#ef4444;">🗑️</button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            dropdown.value = savedDropdownVal;
+            empFilterDropdown.value = savedFilterVal;
+
+        } catch (err) { 
+            console.error("Error loading admin core staff metrics:", err); 
+        }
+    }
+
+    async function fetchLiveReports() {
+        try {
+            const res = await fetch(`/api/documents/admin-reports/${adminInfo.id}`);
+            if (!res.ok) throw new Error('Network reporting engine response mismatch');
+            allReports = await res.json();
+            filterReports(true); 
+        } catch (err) { 
+            console.error("Error in real-time reporting pipeline sync:", err); 
+        }
+    }
+
+    // 🎯 RENDERING + COUNTERS AGGREGATION LOGIC
+    function renderReports(reports) {
+        const tbody = document.getElementById('adminReportTableBody');
+        if (!tbody) return;
+        tbody.innerHTML = '';
+
+        let countNew = 0; let countRinging = 0; let countInterested = 0; let countFollowUp = 0; let countRejected = 0;
+
+        // 🧹 WORKSPACE CLEANER EXCLUSION LAYER FILTER
+        const activeUnarchivedLeads = reports.filter(rep => !clientSideArchiveList.includes(rep._id));
+
+        if(activeUnarchivedLeads.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:#888;">No active records found. Clean filters or Reset Workspace.</td></tr>';
+            updateCounterUI(0, 0, 0, 0, 0);
+            return;
+        }
+
+        activeUnarchivedLeads.forEach(rep => {
+            const empName = rep.employeeId ? rep.employeeId.name : '<span style="color:#ef4444; font-weight:bold;">Deleted Emp</span>';
+            const fileName = rep.documentId ? rep.documentId.fileName : 'Direct Entry/Deleted Sheet';
+            const dateTime = new Date(rep.updatedAt).toLocaleString();
+            const statusCSSClass = String(rep.status).toLowerCase().replace(' ', '-');
+
+            if (rep.status === 'New') countNew++;
+            else if (rep.status === 'Ringing') countRinging++;
+            else if (rep.status === 'Interested') countInterested++;
+            else if (rep.status === 'Follow-up') countFollowUp++;
+            else if (rep.status === 'Rejected') countRejected++;
+
+            tbody.innerHTML += `
+                <tr>
+                    <td><strong>${empName}</strong></td>
+                    <td><small style="color:#22c55e">${fileName}</small></td>
+                    <td><strong>${rep.customerName}</strong><br><small style="color:var(--text-muted)">${rep.customerPhone}</small></td>
+                    <td><span class="status-badge status-${statusCSSClass}">${rep.status}</span></td>
+                    <td>${rep.remarks || '-'}</td>
+                    <td><small>${dateTime}</small></td>
+                </tr>
+            `;
+        });
+
+        updateCounterUI(countNew, countRinging, countInterested, countFollowUp, countRejected);
+    }
+
+    function updateCounterUI(cNew, cRing, cInt, cFollow, cRej) {
+        if(document.getElementById('counterNew')) document.getElementById('counterNew').innerText = cNew;
+        if(document.getElementById('counterRinging')) document.getElementById('counterRinging').innerText = cRing;
+        if(document.getElementById('counterInterested')) document.getElementById('counterInterested').innerText = cInt;
+        if(document.getElementById('counterFollowUp')) document.getElementById('counterFollowUp').innerText = cFollow;
+        if(document.getElementById('counterRejected')) document.getElementById('counterRejected').innerText = cRej;
+    }
+
+    function filterReports(isBackgroundSync = false) {
+        const empFilter = document.getElementById('reportEmpFilter');
+        const statusFilter = document.getElementById('reportStatusFilter');
+        const startDateEl = document.getElementById('reportStartDate');
+        const endDateEl = document.getElementById('reportEndDate');
+
+        if (!empFilter || !statusFilter || !startDateEl || !endDateEl) return;
+
+        const selectedEmpId = empFilter.value;
+        const selectedStatus = statusFilter.value;
+        const startDateVal = startDateEl.value;
+        const endDateVal = endDateEl.value;
+
+        let filtered = allReports;
+
+        if (selectedEmpId !== 'All') {
+            filtered = filtered.filter(r => r.employeeId && r.employeeId._id === selectedEmpId);
+        }
+        if (selectedStatus !== 'All') {
+            filtered = filtered.filter(r => r.status === selectedStatus);
+        }
+        if (startDateVal) {
+            const start = new Date(startDateVal); start.setHours(0,0,0,0);
+            filtered = filtered.filter(r => new Date(r.updatedAt) >= start);
+        }
+        if (endDateVal) {
+            const end = new Date(endDateVal); end.setHours(23,59,59,999);
+            filtered = filtered.filter(r => new Date(r.updatedAt) <= end);
+        }
+
+        filteredReportsGlobal = filtered; 
+        renderReports(filtered);
+    }
+
+    // 🧹 WORKSPACE MODAL CONTROLLER INTERACTION
+    function openArchiveModal() { 
+        const modal = document.getElementById('archiveModal');
+        if (modal) modal.style.display = "flex"; 
+    }
+    function closeArchiveModal() { 
+        const modal = document.getElementById('archiveModal');
+        if (modal) modal.style.display = "none"; 
+    }
+
+    function processWorkspaceArchive() {
+        const checkedStatuses = [];
+        const archRej = document.getElementById('archRej');
+        const archInt = document.getElementById('archInt');
+        const archRing = document.getElementById('archRing');
+        const archFollow = document.getElementById('archFollow');
+        const timeframeEl = document.getElementById('archiveTimeframe');
+
+        if(archRej && archRej.checked) checkedStatuses.push('Rejected');
+        if(archInt && archInt.checked) checkedStatuses.push('Interested');
+        if(archRing && archRing.checked) checkedStatuses.push('Ringing');
+        if(archFollow && archFollow.checked) checkedStatuses.push('Follow-up');
+        
+        const daysLimit = timeframeEl ? parseInt(timeframeEl.value) : 0;
+        let archiveCounter = 0;
+
+        allReports.forEach(rep => {
+            let matchesStatus = checkedStatuses.includes(rep.status);
+            let matchesDate = false;
+
+            if(daysLimit > 0) {
+                const leadDate = new Date(rep.updatedAt);
+                const cutoffDate = new Date();
+                cutoffDate.setDate(cutoffDate.getDate() - daysLimit);
+                if(leadDate < cutoffDate) { matchesDate = true; }
+            }
+
+            if(matchesStatus || matchesDate) {
+                if(!clientSideArchiveList.includes(rep._id)) {
+                    clientSideArchiveList.push(rep._id);
+                    archiveCounter++;
+                }
+            }
+        });
+
+        localStorage.setItem('adminWorkspaceArchive', JSON.stringify(clientSideArchiveList));
+        alert(`🧹 Cleaned! Total ${archiveCounter} rows successfully moved to backend storage archives.`);
+        closeArchiveModal();
+        filterReports();
+    }
+
+    // 🔒 RELEASING ANTI-CHEAT DEVICE MULTI-LOGIN IDENTIFIER
+    async function forceKillSession(empId) {
+        if(!confirm("Kya aap is employee ke lagaye gaye security session hardware token lock ko clear karna chahte hain? Iske baad wo naye system se login kar payega.")) return;
+        try {
+            const res = await fetch(`/api/employees/clear-device-lock/${empId}`, { method: 'PUT' });
+            if(res.ok) {
+                alert("🔓 Token configuration released successfully!");
+                loadAdminData();
+            } else {
+                alert("System unable to communicate with token engine.");
+            }
+        } catch(err) { alert("Server connectivity block."); }
+    }
+
+    function clearDateFilters() {
+        const start = document.getElementById('reportStartDate');
+        const end = document.getElementById('reportEndDate');
+        if (start) start.value = '';
+        if (end) end.value = '';
+        filterReports();
+    }
+
+    function downloadReportExcel() {
+        if (typeof XLSX === 'undefined') return alert('❌ Excel processing library (SheetJS) load nahi hui hai!');
+        if(filteredReportsGlobal.length === 0) return alert('No data available to download!');
+        const activeUnarchivedExcel = filteredReportsGlobal.filter(rep => !clientSideArchiveList.includes(rep._id));
+        
+        const excelRows = activeUnarchivedExcel.map(rep => ({
+            "Employee Name": rep.employeeId ? rep.employeeId.name : 'N/A',
+            "Source Sheet": rep.documentId ? rep.documentId.fileName : 'N/A',
+            "Customer Name": rep.customerName,
+            "Customer Phone": rep.customerPhone,
+            "Status": rep.status,
+            "Remarks": rep.remarks || '',
+            "Date Time Logged": new Date(rep.updatedAt).toLocaleString()
+        }));
+
+        const worksheet = XLSX.utils.json_to_sheet(excelRows);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Calling Reports");
+        XLSX.writeFile(workbook, `CRM_Report_${new Date().toISOString().slice(0,10)}.xlsx`);
+    }
+
+    // 👤 CREATE EMPLOYEE FORM SUBSCRIPTION
+    const addEmpForm = document.getElementById('addEmpForm');
+    if (addEmpForm) {
+        addEmpForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const name = document.getElementById('empName').value;
+            const email = document.getElementById('empEmail').value;
+            const password = document.getElementById('empPass').value;
+
+            try {
+                const res = await fetch('/api/employees/add', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ adminId: adminInfo.id, name, email, password })
+                });
+
+                if(res.ok) {
+                    alert('🎉 Employee ID Created Successfully!');
+                    addEmpForm.reset();
+                    initAdminDashboard();
+                } else { 
+                    const errData = await res.json().catch(() => ({}));
+                    alert(`Error creating account: ${errData.message || 'Email already active'}`); 
+                }
+            } catch (error) {
+                console.error(error);
+                alert("Server connection timeout!");
+            }
+        });
+    }
+
+    // 📁 BULK EXCEL UPLOAD AND DATA SPLITTING MANAGEMENT ENGINE 
+    const uploadForm = document.getElementById('uploadForm');
+    if (uploadForm) {
+        uploadForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (typeof XLSX === 'undefined') return alert('❌ Excel processing library load nahi hui hai!');
+            
+            const fileInput = document.getElementById('myFile');
+            const empSelect = document.getElementById('empSelect');
+            if (!fileInput || !fileInput.files[0] || !empSelect) return alert('File or dropdown element missing.');
+            
+            if (empSelect.value !== "SPLIT_EQUALLY") {
+                // SINGLE UPLOAD MODE
+                const formData = new FormData();
+                formData.append('myFile', fileInput.files[0]);
+                formData.append('adminId', adminInfo.id);
+                formData.append('employeeId', empSelect.value);
+
+                const res = await fetch('/api/documents/upload', { method: 'POST', body: formData });
+                if(res.ok) {
+                    alert('🚀 Sheet Assigned to Single Employee Successfully!');
+                    uploadForm.reset();
+                    const splitterBox = document.getElementById('splitterSection');
+                    if (splitterBox) splitterBox.style.display = "none";
+                    fetchLiveReports();
+                } else { alert('Upload failed'); }
+            } else {
+                // EQUAL SPLIT MODE
+                const selectedEmployeeIds = [];
+                currentActiveEmployeesBackup.forEach(emp => {
+                    const cb = document.getElementById(`split-checkbox-${emp._id}`);
+                    if (cb && cb.checked) { selectedEmployeeIds.push(emp._id); }
+                });
+
+                if (selectedEmployeeIds.length === 0) {
+                    return alert('⚠️ Data split karne ke liye kam se kam ek employee ko Ticked rakhna zaroori hai!');
+                }
+
+                alert(`⏳ Excel data load ho raha hai. Total ${selectedEmployeeIds.length} employees me data break hoga...`);
+
+                const file = fileInput.files[0];
+                const reader = new FileReader();
+
+                reader.onload = async function(e) {
+                    try {
+                        const data = new Uint8Array(e.target.result);
+                        const workbook = XLSX.read(data, { type: 'array' });
+                        const firstSheetName = workbook.SheetNames[0];
+                        const worksheet = workbook.Sheets[firstSheetName];
+                        
+                        const rows = XLSX.utils.sheet_to_json(worksheet);
+                        if(rows.length === 0) return alert('❌ Uploaded Excel file is empty!');
+
+                        let totalRows = rows.length;
+                        let empCount = selectedEmployeeIds.length;
+                        let chunkSize = Math.ceil(totalRows / empCount);
+                        let successCounter = 0;
+
+                        // Loop through employees and generate UNIQUE chunks
+                        for (let i = 0; i < empCount; i++) {
+                            let startIdx = i * chunkSize;
+                            let endIdx = Math.min(startIdx + chunkSize, totalRows);
+                            if (startIdx >= totalRows) break; 
+
+                            let subArray = rows.slice(startIdx, endIdx);
+                            const subWorksheet = XLSX.utils.json_to_sheet(subArray);
+                            const subWorkbook = XLSX.utils.book_new();
+                            XLSX.utils.book_append_sheet(subWorkbook, subWorksheet, "AssignedLeads");
+                            
+                            // Essential: write out as array type
+                            const excelBuffer = XLSX.write(subWorkbook, { bookType: 'xlsx', type: 'array' });
+                            const blob = new Blob([excelBuffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+                            
+                            // 🔥 FIX: Added unique timestamp & index to filename so multer doesn't conflict or duplicate reference data
+                            const uniqueFileName = `Part_${i+1}_${Date.now()}_${file.name}`;
+                            const splitFile = new File([blob], uniqueFileName, { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+
+                            const formData = new FormData();
+                            formData.append('myFile', splitFile);
+                            formData.append('adminId', adminInfo.id);
+                            formData.append('employeeId', selectedEmployeeIds[i]);
+
+                            // Fire standard individual requests sequentially
+                            const res = await fetch('/api/documents/upload', { method: 'POST', body: formData });
+                            if(res.ok) successCounter++;
+                        }
+
+                        alert(`🎯 Bulk distribution completed. Total ${successCounter} split sheets distributed perfectly!`);
+                        uploadForm.reset();
+                        const splitterBox = document.getElementById('splitterSection');
+                        if (splitterBox) splitterBox.style.display = "none";
+                        fetchLiveReports();
+
+                    } catch (err) {
+                        console.error(err);
+                        alert('❌ Error reading or splitting excel architecture.');
+                    }
+                };
+                reader.readAsArrayBuffer(file);
+            }
+        });
+    }
+
+    async function changePassword(empId) {
+        const passInput = document.getElementById(`pass-${empId}`);
+        const newPassword = passInput ? passInput.value : '';
+        if(!newPassword) return alert('Please enter a new password first!');
+        const res = await fetch(`/api/employees/update-password/${empId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ newPassword })
+        });
+        if(res.ok) { 
+            alert('🔑 Password changed successfully!'); 
+            loadAdminData(); 
+        }
+    }
+
+    async function toggleAccess(empId, currentStatus) {
+        const nextStatus = currentStatus === 'Active' ? 'Suspended' : 'Active';
+        if(!confirm(`Are you sure you want to make this employee ${nextStatus}?`)) return;
+        const res = await fetch(`/api/employees/toggle-status/${empId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: nextStatus })
+        });
+        if(res.ok) { loadAdminData(); }
+    }
+
+    async function deleteEmployee(empId) {
+        if(!confirm('🚨 Warning! This will permanently delete the employee login. Proceed?')) return;
+        const res = await fetch(`/api/employees/delete/${empId}`, { method: 'DELETE' });
+        if(res.ok) { alert('🗑️ Employee deleted!'); initAdminDashboard(); }
+    }
+
+    // Run Initial Load
+    initAdminDashboard();
+
+    // ⏱️ [AUTO-POLLING SYNC]
+    setInterval(() => {
+        fetchLiveReports();
+    }, 5000);
+
+    // 🚪 [SECURE LOGOUT]
+    function logout() { 
+        if(confirm("Sign out karna chahte hain?")) {
+            localStorage.clear(); 
+            sessionStorage.clear();
+            window.location.href = '/admin-login.html'; 
+        }
+    }
+</script>
+</body>
+</html>

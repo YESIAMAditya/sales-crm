@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sales CRM - Admin Portal</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+</head>
+<body class="bg-slate-900 text-white flex items-center justify-center h-screen">
+
+    <div class="bg-slate-800 p-8 rounded-2xl shadow-2xl w-full max-w-md border border-slate-700">
+        <div class="text-center mb-6">
+            <h1 class="text-3xl font-extrabold text-indigo-400 tracking-wide">SALES CRM</h1>
+            <p class="text-slate-400 text-sm mt-1">Register your company admin account</p>
+        </div>
+
+        <form id="registerForm" class="space-y-4">
+            <div>
+                <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Company Name</label>
+                <input type="text" id="companyName" required class="w-full px-4 py-2.5 bg-slate-950 border border-slate-700 rounded-xl focus:outline-none focus:border-indigo-500 text-white transition-all" placeholder="e.g. Tech Mahindra">
+            </div>
+
+            <div>
+                <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Email Address</label>
+                <input type="email" id="email" required class="w-full px-4 py-2.5 bg-slate-950 border border-slate-700 rounded-xl focus:outline-none focus:border-indigo-500 text-white transition-all" placeholder="admin@company.com">
+            </div>
+
+            <div>
+                <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Password</label>
+                <input type="password" id="password" required class="w-full px-4 py-2.5 bg-slate-950 border border-slate-700 rounded-xl focus:outline-none focus:border-indigo-500 text-white transition-all" placeholder="••••••••">
+            </div>
+
+            <div>
+                <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Master Recovery Key (Secret)</label>
+                <input type="text" id="secretKey" class="w-full px-4 py-2.5 bg-slate-950 border border-slate-700 rounded-xl focus:outline-none focus:border-indigo-500 text-white transition-all" placeholder="Default is admin123 (Change if you want)">
+                <p class="text-[10px] text-slate-500 mt-0.5">*Remember this key to reset password if you forget it.</p>
+            </div>
+
+            <button type="submit" class="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl shadow-lg shadow-indigo-600/30 transition-all cursor-pointer mt-2">
+                Create & Login to Dashboard
+            </button>
+        </form>
+
+        <p id="message" class="mt-4 text-center text-sm font-semibold hidden"></p>
+        
+        <div class="text-center mt-4">
+            <a href="Login.html" class="text-xs text-indigo-400 hover:underline">Already have an admin account? Sign In</a>
+        </div>
+    </div>
+
+    <script>
+        const form = document.getElementById('registerForm');
+        const messageEl = document.getElementById('message');
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault(); // Page refresh hone se rokne ke liye
+
+            const companyName = document.getElementById('companyName').value;
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const secretKey = document.getElementById('secretKey').value || "admin123"; // Custom key ya fir default setup
+
+            try {
+                // Backend API ko data bhejna
+                const response = await fetch('http://localhost:5000/api/auth/register-admin', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ companyName, email, password, secretKey })
+                });
+
+                const data = await response.json();
+
+                messageEl.classList.remove('hidden');
+                
+                if (response.ok) {
+                    messageEl.className = "mt-4 text-center text-sm font-semibold text-emerald-400";
+                    messageEl.innerText = "🎉 " + data.message;
+                    
+                    // 🔥 STEP 2 LATEST: Token aur Admin Info localstorage mein save karna
+                    localStorage.setItem('adminToken', data.token);
+                    localStorage.setItem('adminInfo', JSON.stringify(data.admin));
+                    
+                    form.reset(); // Form khali karne ke liye
+
+                    // 🚀 DIRECT DASHBOARD REDIRECT: Bina ruke seedhe dashboard par bhej rahe hain
+                    setTimeout(() => {
+                       // login.html ke andar line number 76 ke aas-pass badlein:
+                    // index.html ke andar line number 84 ke aas-pass badlein:
+                    window.location.href = 'http://localhost:5000/dashboard.html';
+                    }, 1200); // 1.2 second ka delay diya taaki user ko "🎉 Registration Successful" ka alert dikh sake
+
+                } else {
+                    messageEl.className = "mt-4 text-center text-sm font-semibold text-rose-400";
+                    messageEl.innerText = "❌ " + data.message;
+                }
+            } catch (error) {
+                messageEl.classList.remove('hidden');   
+                messageEl.className = "mt-4 text-center text-sm font-semibold text-rose-400";
+                messageEl.innerText = "❌ Cannot connect to backend server!";
+            }
+        });
+    </script>
+</body>
+</html>

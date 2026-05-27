@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Login & Recovery</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background-color: #0f172a; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; color: white; }
+        .login-card { background: #1e293b; padding: 30px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); width: 350px; }
+        h2 { color: #deff9a; margin-top: 0; text-align: center; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-size: 14px; }
+        input { width: 100%; padding: 10px; border-radius: 5px; border: 1px solid #475569; background-color: #334155; color: #fff; box-sizing: border-box; }
+        .btn { width: 100%; padding: 12px; background: #deff9a; color: black; border: none; font-weight: bold; border-radius: 5px; cursor: pointer; margin-top: 10px; }
+        .btn:hover { background: #bada78; }
+        .link-text { text-align: center; margin-top: 15px; font-size: 13px; color: #deff9a; cursor: pointer; display: block; }
+    </style>
+</head>
+<body>
+
+    <div class="login-card" id="loginBox">
+        <h2>Admin Sign In</h2>
+        <form id="adminLoginForm">
+            <div class="form-group">
+                <label>Admin Email</label>
+                <input type="email" id="loginEmail" required placeholder="admin@company.com">
+            </div>
+            <div class="form-group">
+                <label>Password</label>
+                <input type="password" id="loginPassword" required placeholder="••••••••">
+            </div>
+            <button type="submit" class="btn">Login to Control Center</button>
+            <span class="link-text" onclick="toggleView(true)">🔑 Forgot Password? / Reset</span>
+        </form>
+    </div>
+
+    <div class="login-card" id="recoveryBox" style="display: none;">
+        <h2>Reset Admin Password</h2>
+        <form id="adminRecoveryForm">
+            <div class="form-group">
+                <label>Your Registered Email</label>
+                <input type="email" id="recoverEmail" required placeholder="admin@company.com">
+            </div>
+            <div class="form-group">
+                <label>Master Secret Key</label>
+                <input type="password" id="recoverSecretKey" required placeholder="Default is admin123">
+            </div>
+            <div class="form-group">
+                <label>Enter New Password</label>
+                <input type="password" id="recoverNewPassword" required placeholder="Create New Password">
+            </div>
+            <button type="submit" class="btn" style="background:#ef4444; color:white;">Change Password & Save</button>
+            <span class="link-text" onclick="toggleView(false)">⬅️ Back to Login</span>
+        </form>
+    </div>
+
+    <script>
+        // View switch karne ke liye function
+function toggleView(showRecovery) {
+    document.getElementById('loginBox').style.display = showRecovery ? 'none' : 'block';
+    document.getElementById('recoveryBox').style.display = showRecovery ? 'block' : 'none';
+}
+
+// 🔥 LOGIN PROCESS FIXED (ADDED LOCALHOST PORT 5000)
+document.getElementById('adminLoginForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const email = document.getElementById('loginEmail').value;
+    const password = document.getElementById('loginPassword').value;
+
+    try {
+        // 🚀 Pura URL localhost port ke sath dal diya hai
+        const res = await fetch('http://localhost:5000/api/auth/login-admin', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password })
+        });
+
+        const data = await res.json();
+
+        if (res.ok) {
+            alert('👋 Welcome Back Admin!');
+            
+            // Token aur Admin Details ko localStorage mein set karna zaroori hai
+            localStorage.setItem('adminToken', data.token);
+            localStorage.setItem('adminInfo', JSON.stringify(data.admin));
+            
+            // Dashboard par redirect
+            // login.html ke andar line number 76 ke aas-pass badlein:
+window.location.href = 'http://localhost:5000/dashboard.html';
+        } else {
+            alert('❌ Login Failed: ' + data.message);
+        }
+    } catch (err) {
+        console.error(err);
+        alert('Network Error! Cannot connect to backend server. Make sure node server is running on port 5000.');
+    }
+});
+
+// 🔥 RECOVERY PROCESS FIXED (ADDED LOCALHOST PORT 5000)
+document.getElementById('adminRecoveryForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const email = document.getElementById('recoverEmail').value;
+    const secretKey = document.getElementById('recoverSecretKey').value;
+    const newPassword = document.getElementById('recoverNewPassword').value;
+
+    try {
+        // 🚀 Recovery endpoint par bhi pura URL set kar diya hai
+        const res = await fetch('http://localhost:5000/api/auth/admin-forgot-password', { 
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, secretKey, newPassword })
+        });
+
+        const data = await res.json();
+
+        if (res.ok) {
+            alert(data.message);
+            document.getElementById('adminRecoveryForm').reset();
+            toggleView(false); // Reset ke baad wapas login screen par bhej dena
+        } else {
+            alert('❌ Error: ' + data.message);
+        }
+    } catch (err) {
+        console.error(err);
+        alert('Network Error! Reset failed.');
+    }
+});
+    </script>
+</body>
+</html>
