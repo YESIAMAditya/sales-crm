@@ -12,12 +12,13 @@ app.use(express.static('public')); // Frontend static files ke liye
 app.use('/api/super-admin', require('./routes/superAdmin'));
 
 // LOCAL DATABASE CONNECTION (No Internet, No Router Block, No IP Whitelist required!)
-const LOCAL_MONGO_URI = "mongodb://127.0.0.1:27017/sales_crm";
+// Aise likho taaki Render ka variable use ho
+const MONGO_URI = process.env.MONGO_URI || "mongodb://127.0.0.1:27017/sales_crm";
 
-mongoose.connect(LOCAL_MONGO_URI)
-  .then(() => console.log('===============================================\n✅ DATABASE CONNECTED SUCCESSFULLY TO LOCAL MONGODB!\n==============================================='))
-  .catch((err) => console.error('❌ Database connection error:', err.message));
-
+mongoose.connect(MONGO_URI)
+  .then(() => console.log('✅ DATABASE CONNECTED!'))
+  .catch((err) => console.error('❌ Database connection error:', err));
+  
 // Routes Link
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/employees', require('./routes/employees'));
